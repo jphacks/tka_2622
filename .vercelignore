@@ -2,8 +2,9 @@
 .git
 .next
 .zcode
+artifacts
 node_modules
 tokyo-reuse-data
-supabase
+/supabase/
 scripts
 *.tsbuildinfo
