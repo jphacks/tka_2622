@@ -5,6 +5,7 @@ import {
   getSupabaseServerClient,
   requirePageUser,
 } from "../../lib/supabase/server";
+import { AnalyzeResponseSchema } from "../../types/recognition";
 
 export default async function ItemsPage() {
   const user = await requirePageUser();
@@ -20,7 +21,7 @@ export default async function ItemsPage() {
   const { data: items, error } = await supabase
     .from("user_items")
     .select(
-      "id, image_path, name, analysis_status, status, selected_action",
+      "id, image_path, name, recognition_result, analysis_status, status, selected_action",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
@@ -35,9 +36,20 @@ export default async function ItemsPage() {
         console.error("Could not create a private inventory image URL.", imageError);
         throw new Error("持ち物の写真を読み込めませんでした。");
       }
+      const recognition = item.recognition_result
+        ? AnalyzeResponseSchema.safeParse(item.recognition_result)
+        : null;
+      if (recognition && !recognition.success) {
+        console.error("Inventory recognition snapshot is invalid.", {
+          reason: "stored_schema_validation_failed",
+          issueCount: recognition.error.issues.length,
+        });
+      }
       return {
         id: item.id,
-        name: item.name,
+        name:
+          item.name ??
+          (recognition?.success ? recognition.data.item.name : null),
         analysisStatus: item.analysis_status,
         status: item.status,
         selectedAction: item.selected_action,
@@ -48,7 +60,7 @@ export default async function ItemsPage() {
 
   return (
     <main className="inventory-stage inventory-list-stage">
-      <AccountHeader brandName="JPHACK" />
+      <AccountHeader />
       <InventoryCollection items={inventoryItems} />
     </main>
   );

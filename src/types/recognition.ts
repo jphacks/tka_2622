@@ -38,6 +38,7 @@ export const AnalyzeResponseSchema = z.object({
     action: ActionSchema.nullable(),
     reason: z.string(),
   }),
+  recommendationBasis: RecognizedItemSchema.optional(),
 });
 
 export const Pipeline2InputSchema = z.object({

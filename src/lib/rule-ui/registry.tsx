@@ -41,7 +41,6 @@ export const { registry: ruleUiRegistry } = defineRegistry(ruleUiCatalog, {
     ),
     ActionGuideCard: ({ props }) => (
       <section className="rule-card rule-action-guide">
-        <div className="rule-card-eyebrow">次の一歩</div>
         <h2>{props.title}</h2>
         <p>{props.introduction}</p>
         <p className="rule-directory-message">{props.directoryMessage}</p>
@@ -105,14 +104,14 @@ export const { registry: ruleUiRegistry } = defineRegistry(ruleUiCatalog, {
           {props.items.map((item, index) => (
             <li key={`${index}-${item}`}>
               <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-              {item}
+              <div className="rule-step-copy">{item}</div>
             </li>
           ))}
         </ol>
       </section>
     ),
-    StoreList: ({ props }) => (
-      <section className="rule-card rule-store-list">
+    StoreList: ({ props }) => props.items.length === 0 ? null : (
+      <section className="rule-card rule-store-list" id="store-list">
         <h3>買取対応を確認したお店</h3>
         {props.items.map((store) => (
           <article key={store.id} className="rule-store">

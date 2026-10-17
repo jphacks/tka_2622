@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { AccountHeader } from "../../../components/account/AccountHeader";
 import { InventoryItemFlow } from "../../../components/inventory/InventoryItemFlow";
-import { AnalyzeResponseSchema } from "../../../types/recognition";
+import { ActionSchema, AnalyzeResponseSchema } from "../../../types/recognition";
 import { RuleResultSchema } from "../../../server/rules/schemas";
 import {
   getSupabaseServerClient,
@@ -27,7 +27,7 @@ export default async function InventoryItemPage({
   const { data: item, error } = await supabase
     .from("user_items")
     .select(
-      "id, image_path, name, category, condition_grade, observations, recognition_result, recommended_action, recommendation_reason, selected_action, analysis_status, status, updated_at",
+      "id, image_path, name, category, condition_grade, observations, recognition_result, recommended_action, recommendation_reason, selected_action, analysis_status, status, created_at, updated_at",
     )
     .eq("id", id)
     .eq("user_id", user.id)
@@ -43,19 +43,32 @@ export default async function InventoryItemPage({
     throw new Error("写真を読み込めませんでした。");
   }
 
-  const { data: plan, error: planError } = await supabase
+  const { data: handlingPlan, error: planError } = await supabase
     .from("handling_plans")
     .select("selected_action, handling_guide")
     .eq("item_id", id)
     .eq("user_id", user.id)
     .maybeSingle();
   if (planError) throw new Error("整理プランを読み込めませんでした。");
-  const savedResult = plan
-    ? RuleResultSchema.safeParse(plan.handling_guide)
+  const savedResult = handlingPlan
+    ? RuleResultSchema.safeParse(handlingPlan.handling_guide)
     : null;
   if (savedResult && !savedResult.success) {
     throw new Error("保存済みの整理プランを読み取れませんでした。");
   }
+  if (
+    handlingPlan &&
+    savedResult?.success &&
+    handlingPlan.selected_action !== savedResult.data.selectedAction
+  ) {
+    throw new Error("保存済みの整理方法と手順が一致しません。");
+  }
+  const savedAction = handlingPlan
+    ? ActionSchema.parse(handlingPlan.selected_action)
+    : item.selected_action
+      ? ActionSchema.parse(item.selected_action)
+      : null;
+
   const recognition = item.recognition_result
     ? AnalyzeResponseSchema.safeParse(item.recognition_result)
     : null;
@@ -65,26 +78,25 @@ export default async function InventoryItemPage({
   ) {
     throw new Error("保存済みのAI分析結果を読み取れませんでした。");
   }
+  const recognizedItem = recognition?.success ? recognition.data.item : null;
 
   return (
-    <main className="inventory-stage">
+    <main className="inventory-stage inventory-detail-stage">
       <AccountHeader />
       <InventoryItemFlow
         initialItem={{
           id: item.id,
           imageUrl: signedImage.signedUrl,
-          name: item.name,
-          category: item.category,
-          conditionGrade: item.condition_grade,
-          observations: item.observations,
-          recommendedAction: item.recommended_action,
-          recommendationReason: item.recommendation_reason,
-          selectedAction: item.selected_action,
+          name: item.name ?? recognizedItem?.name ?? null,
+          category: item.category ?? recognizedItem?.category ?? null,
+          conditionGrade:
+            item.condition_grade ?? recognizedItem?.condition.grade ?? null,
           analysisStatus: item.analysis_status,
           status: item.status,
-          updatedAt: item.updated_at,
+          capturedAt: item.created_at,
         }}
         initialRecognition={recognition?.success ? recognition.data : null}
+        initialSelectedAction={savedAction}
         initialResult={savedResult?.success ? savedResult.data : null}
       />
     </main>

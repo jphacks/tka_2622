@@ -5,6 +5,7 @@ import { resolveAction } from "./action";
 import { getExceptionNotices } from "./exceptions";
 import { recommendAction } from "./recommendation";
 import { RuleInputSchema, RuleResultSchema, type RuleInput } from "./schemas";
+import { ruleItemCategory } from "../../lib/item-category";
 
 const DEFAULT_SERVICE_PROVIDER = new EmptyRuleServiceProvider();
 
@@ -12,7 +13,17 @@ export async function evaluateRules(
   inputValue: RuleInput,
   serviceProvider: RuleServiceProvider = DEFAULT_SERVICE_PROVIDER,
 ) {
-  const input = RuleInputSchema.parse(inputValue);
+  const parsedInput = RuleInputSchema.parse(inputValue);
+  const input: RuleInput = {
+    ...parsedInput,
+    item: {
+      ...parsedInput.item,
+      category: ruleItemCategory(
+        parsedInput.item.category,
+        parsedInput.item.name,
+      ),
+    },
+  };
   const recommendation = recommendAction(input);
   const selectedAction: Action =
     input.selectedAction ?? recommendation.action;

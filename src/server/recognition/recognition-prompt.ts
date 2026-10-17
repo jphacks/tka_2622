@@ -5,6 +5,8 @@ export const RECOGNITION_SYSTEM_PROMPT = `あなたは、日本の大学生の�
 
 - 物品名は日本語で簡潔に記述し、判別できない場合は「不明な物品」としてください。
 - category は furniture / electronics / books / clothing / bicycle / household / other のいずれかです。
+- ゲーム機や携帯型ゲーム機は electronics に分類し、写真で確認できる範囲の製品名だけを使ってください。型番を推測しないでください。
+- 本は books、椅子は furniture、冷蔵庫などの大型家電は electronics に分類してください。
 - condition.grade は写真から見える外観だけを1〜5で評価し、判定できない場合は null にしてください。これは機能、安全性、使用歴や中古取引上の等級を表しません。
 - condition.observations には写真から実際に確認できる特徴だけを日本語で記述してください。
 - condition.needsUserConfirmation は、物品や状態の確認が必要な場合 true にしてください。

@@ -248,8 +248,9 @@ describe("RuleResult to json-render Spec", () => {
     expect(keepGuide?.props.introduction).toContain("ネックやボディ");
     expect(sellCta?.props).toEqual({
       label: "近くの買取店を探す",
-      target: "#station-selector",
+      target: "#store-list",
     });
+    expect(componentTypes(sellSpec)).toContain("StoreList");
     expect(keepCta?.props).toEqual({
       label: "持っていく準備をする",
       target: "#action-checklist",

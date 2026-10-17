@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireApiUser } from "../../../../lib/supabase/server";
+import { AnalyzeResponseSchema } from "../../../../types/recognition";
 
 const ItemIdSchema = z.string().uuid();
 const ItemEditSchema = z.object({
@@ -64,6 +65,113 @@ export async function PATCH(
     );
   }
 
+  const { data: current, error: loadError } = await auth.supabase
+    .from("user_items")
+    .select("recognition_result, analysis_status, status")
+    .eq("id", id)
+    .eq("user_id", auth.user.id)
+    .is("selected_action", null)
+    .maybeSingle();
+  if (loadError) {
+    console.error("Could not load recognition data for an inventory item.", loadError);
+    return Response.json(
+      {
+        error: {
+          code: "ITEM_LOAD_FAILED",
+          message: "物品情報を読み込めませんでした。時間をおいて再度お試しください。",
+        },
+      },
+      { status: 503 },
+    );
+  }
+  if (
+    current?.analysis_status === "failed" &&
+    current.status === "pending" &&
+    current.recognition_result === null
+  ) {
+    const { data, error } = await auth.supabase
+      .from("user_items")
+      .update({
+        name: parsed.data.name,
+        category: parsed.data.category,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("user_id", auth.user.id)
+      .eq("analysis_status", "failed")
+      .eq("status", "pending")
+      .is("selected_action", null)
+      .is("recognition_result", null)
+      .select(
+        "id, name, category, condition_grade, observations, recognition_result, recommended_action, recommendation_reason, analysis_status, status, selected_action",
+      )
+      .maybeSingle();
+    if (error) {
+      console.error("Could not save manual item details after recognition failure.", {
+        code: error.code,
+      });
+      return Response.json(
+        {
+          error: {
+            code: "ITEM_UPDATE_FAILED",
+            message: "物品情報を保存できませんでした。時間をおいて再度お試しください。",
+          },
+        },
+        { status: 503 },
+      );
+    }
+    if (!data) {
+      return Response.json(
+        {
+          error: {
+            code: "ITEM_NOT_EDITABLE",
+            message: "この持ち物は現在編集できません。",
+          },
+        },
+        { status: 409 },
+      );
+    }
+    return Response.json({ item: data });
+  }
+  if (!current) {
+    return Response.json(
+      {
+        error: {
+          code: "ITEM_NOT_EDITABLE",
+          message: "分析が完了した持ち物のみ編集できます。",
+        },
+      },
+      { status: 409 },
+    );
+  }
+  if (current.analysis_status !== "succeeded") {
+    return Response.json(
+      {
+        error: {
+          code: "ITEM_NOT_EDITABLE",
+          message: "識別に失敗した持ち物のみ手動で編集できます。",
+        },
+      },
+      { status: 409 },
+    );
+  }
+  const recognition = AnalyzeResponseSchema.safeParse(current.recognition_result);
+  if (!recognition.success) {
+    console.error("Stored recognition data is invalid for an inventory item.", {
+      itemId: id,
+      issues: recognition.error.issues,
+    });
+    return Response.json(
+      {
+        error: {
+          code: "RECOGNITION_DATA_INVALID",
+          message: "認識結果を読み取れないため、物品情報を保存できませんでした。",
+        },
+      },
+      { status: 409 },
+    );
+  }
+
   const { data, error } = await auth.supabase
     .from("user_items")
     .update({
@@ -71,6 +179,21 @@ export async function PATCH(
       category: parsed.data.category,
       condition_grade: parsed.data.conditionGrade,
       observations: parsed.data.observations,
+      recognition_result: {
+        ...recognition.data,
+        recommendationBasis:
+          recognition.data.recommendationBasis ?? recognition.data.item,
+        item: {
+          ...recognition.data.item,
+          name: parsed.data.name,
+          category: parsed.data.category,
+          condition: {
+            ...recognition.data.item.condition,
+            grade: parsed.data.conditionGrade,
+            observations: parsed.data.observations,
+          },
+        },
+      },
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

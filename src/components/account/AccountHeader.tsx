@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "../../lib/supabase/browser";
+import { Brand } from "./Brand";
 
 interface AccountHeaderProps {
   brandName?: string;
 }
 
-export function AccountHeader({ brandName = "よりみち" }: AccountHeaderProps) {
+export function AccountHeader({ brandName = "ものさき。" }: AccountHeaderProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -35,7 +36,7 @@ export function AccountHeader({ brandName = "よりみち" }: AccountHeaderProps
   return (
     <header className="inventory-header">
       <a className="account-wordmark" href="/items" aria-label={brandName}>
-        {brandName}
+        <Brand name={brandName} />
       </a>
       <nav aria-label="アカウントメニュー">
         <a href="/settings">設定</a>

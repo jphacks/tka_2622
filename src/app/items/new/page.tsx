@@ -1,4 +1,5 @@
 import { NewInventoryItemForm } from "../../../components/inventory/NewInventoryItemForm";
+import { Brand } from "../../../components/account/Brand";
 import {
   getSupabaseServerClient,
   requirePageUser,
@@ -19,7 +20,7 @@ export default async function NewItemPage() {
   return (
     <main className="inventory-stage inventory-form-stage">
       <a className="account-wordmark" href="/items" aria-label="持ち物一覧に戻る">
-        よりみち
+        <Brand />
       </a>
       <NewInventoryItemForm />
     </main>

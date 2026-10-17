@@ -3,9 +3,11 @@ import { evaluateRules } from "../../../../../server/rules/engine";
 import { RuleResultSchema } from "../../../../../server/rules/schemas";
 import { SupabaseRuleServiceProvider } from "../../../../../server/rules/providers/supabase-provider";
 import { requireApiUser } from "../../../../../lib/supabase/server";
+import { isRecommendationCurrent } from "../../../../../lib/recognition-workflow";
 
 const PayloadSchema = z.object({
   selectedAction: z.enum(["sell", "give", "dispose", "keep"]),
+  stationId: z.string().trim().min(1).optional(),
 });
 
 export async function POST(
@@ -41,7 +43,9 @@ export async function POST(
 
   const { data: item, error: itemError } = await auth.supabase
     .from("user_items")
-    .select("id, name, category, condition_grade, observations, analysis_status")
+    .select(
+      "id, name, category, condition_grade, observations, analysis_status, recommended_action, recommendation_reason, recognition_result",
+    )
     .eq("id", id)
     .eq("user_id", auth.user.id)
     .maybeSingle();
@@ -73,6 +77,9 @@ export async function POST(
       { status: 409 },
     );
   }
+  const recommendationIsCurrent = isRecommendationCurrent(
+    item.recognition_result,
+  );
 
   const { data: profile, error: profileError } = await auth.supabase
     .from("user_profiles")
@@ -104,25 +111,52 @@ export async function POST(
   }
 
   try {
+    const serviceProvider = new SupabaseRuleServiceProvider();
+    if (parsed.data.stationId) {
+      const stations = await serviceProvider.getStations();
+      if (!stations.some(({ id }) => id === parsed.data.stationId)) {
+        return Response.json(
+          {
+            error: {
+              code: "INVALID_STATION",
+              message: "駅の選択内容を確認してください。",
+            },
+          },
+          { status: 400 },
+        );
+      }
+    }
     const result = RuleResultSchema.parse(
       await evaluateRules(
         {
-          stationId: profile.nearest_station_id,
+          stationId: parsed.data.stationId ?? profile.nearest_station_id,
           item: {
             name: item.name,
             category: item.category,
             conditionGrade: item.condition_grade,
             observations: item.observations,
           },
+          aiRecommendedAction: recommendationIsCurrent
+            ? item.recommended_action
+            : null,
+          aiRecommendationReason: recommendationIsCurrent
+            ? item.recommendation_reason
+            : undefined,
           selectedAction: parsed.data.selectedAction,
         },
-        new SupabaseRuleServiceProvider(),
+        serviceProvider,
       ),
     );
-    const serviceReferences = {
-      confirmed: result.services.items,
-      osmCandidates: result.services.osmCandidates,
-    };
+    const serviceReferences = [
+      ...result.services.items.map((service) => ({
+        source: "confirmed_business" as const,
+        id: service.id,
+      })),
+      ...result.services.osmCandidates.map((candidate) => ({
+        source: "osm_candidate" as const,
+        id: candidate.id,
+      })),
+    ];
     const { data: plan, error: saveError } = await auth.supabase.rpc(
       "save_user_item_handling_plan",
       {
@@ -139,6 +173,21 @@ export async function POST(
           error: {
             code: "PLAN_SAVE_FAILED",
             message: "整理プランを保存できませんでした。時間をおいて再度お試しください。",
+          },
+        },
+        { status: 503 },
+      );
+    }
+    if (!plan || plan.selected_action !== parsed.data.selectedAction) {
+      console.error("The handling plan RPC returned no matching saved plan.", {
+        itemId: id,
+        selectedAction: parsed.data.selectedAction,
+      });
+      return Response.json(
+        {
+          error: {
+            code: "PLAN_SAVE_FAILED",
+            message: "保存結果を確認できませんでした。時間をおいて再度お試しください。",
           },
         },
         { status: 503 },

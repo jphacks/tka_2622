@@ -76,7 +76,7 @@ export function NewInventoryItemForm() {
         </button>
       </form>
       <p className="inventory-privacy-note">
-        対応形式：JPEG・PNG・WebP、5MBまで。登録後にAI分析を実行できます。
+        対応形式：JPEG・PNG・WebP、5MBまで。登録後にAI識別を自動で開始します。
       </p>
     </section>
   );

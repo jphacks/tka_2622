@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Action, ItemCategory } from "../../types/recognition";
 import type { RuleResult } from "../../server/rules/schemas";
 import { ruleUiCatalog } from "./catalog";
+import { displayItemCategory, isMusicalInstrumentName } from "../item-category";
 
 const ACTION_LABELS: Record<Action, string> = {
   keep: "保管する",
@@ -20,19 +21,9 @@ const ACTION_CTA_LABELS: Record<Action, string> = {
 
 const ACTION_CTA_TARGETS: Record<Action, string> = {
   keep: "#action-checklist",
-  sell: "#station-selector",
+  sell: "#store-list",
   give: "#transfer-channels",
   dispose: "#disposal-notices",
-};
-
-const CATEGORY_LABELS: Record<ItemCategory, string> = {
-  furniture: "家具",
-  electronics: "家電・電子機器",
-  books: "本・教材",
-  clothing: "衣類",
-  bicycle: "自転車",
-  household: "日用品",
-  other: "その他",
 };
 
 const CONFIDENCE_LABELS = {
@@ -120,18 +111,15 @@ const CATEGORY_CHECKLISTS: Partial<
     musicalInstrument: "楽器本体・付属品と、確認できた動作状態を整理する",
   },
   give: {
+    furniture: "椅子の脚・背もたれのぐらつきや接合部の状態を相手に伝える",
     books: "書き込みや付属資料の有無を相手に伝える",
     clothing: "サイズや目立つ汚れを相手に伝える",
     musicalInstrument: "音出し確認の可否と付属品の有無を相手に伝える",
   },
 };
 
-function isMusicalInstrument(result: RuleResult): boolean {
-  return /ギター|guitar|楽器/i.test(result.item.name);
-}
-
 function categoryChecklist(result: RuleResult): string[] {
-  const category = isMusicalInstrument(result)
+  const category = isMusicalInstrumentName(result.item.name)
     ? "musicalInstrument"
     : result.item.category;
   const extra = CATEGORY_CHECKLISTS[result.selectedAction]?.[category];
@@ -154,7 +142,7 @@ function personalizedGuide(result: RuleResult): {
   title: string;
   introduction: string;
 } {
-  const instrument = isMusicalInstrument(result);
+  const instrument = isMusicalInstrumentName(result.item.name);
   const categoryTitles: Record<ItemCategory, string> = {
     furniture: "家具",
     electronics: "家電・電子機器",
@@ -217,7 +205,7 @@ function personalizedGuide(result: RuleResult): {
 }
 
 function packingAdvice(result: RuleResult): string[] {
-  if (isMusicalInstrument(result)) {
+  if (isMusicalInstrumentName(result.item.name)) {
     return [
       "ケースがある場合は使用し、ケース内で動くときは柔らかい緩衝材で固定する",
       "ネック・ペグ・ボディに荷重がかからない向きで運ぶ",
@@ -358,6 +346,12 @@ export function validateRuleUiSpec(candidate: unknown): Spec | null {
 export function buildRuleResultSpec(
   result: RuleResult,
   composer: RuleUiComposer = deterministicRuleUiComposer,
+  options: {
+    showRecommendation?: boolean;
+    showItemSummary?: boolean;
+    showActionCta?: boolean;
+    stepsFirst?: boolean;
+  } = {},
 ): Spec {
   const plan = safePlan(result, composer);
   const elements: Spec["elements"] = {};
@@ -368,7 +362,25 @@ export function buildRuleResultSpec(
     elements[key] = { type, props, children: [] };
   };
 
-  for (const block of plan.blocks) {
+  const filteredBlocks = plan.blocks.filter(
+    (block) =>
+      (options.showRecommendation !== false || block !== "recommendation") &&
+      (options.showItemSummary !== false || block !== "item-summary") &&
+      (options.showActionCta !== false || block !== "action-cta"),
+  );
+  const visibleBlocks =
+    options.stepsFirst === true
+      ? [
+          ...filteredBlocks.filter((block) => block === "checklist"),
+          ...filteredBlocks.filter(
+            (block) => block !== "checklist" && block === "action-guide",
+          ),
+          ...filteredBlocks.filter(
+            (block) => block !== "checklist" && block !== "action-guide",
+          ),
+        ]
+      : filteredBlocks;
+  for (const block of visibleBlocks) {
     if (block === "recommendation") {
       add("recommendation", "RecommendationCard", {
         actionLabel: ACTION_LABELS[result.recommendedAction],
@@ -379,7 +391,10 @@ export function buildRuleResultSpec(
     } else if (block === "item-summary") {
       add("item-summary", "ItemSummaryCard", {
         name: result.item.name,
-        categoryLabel: CATEGORY_LABELS[result.item.category],
+        categoryLabel: displayItemCategory(
+          result.item.category,
+          result.item.name,
+        ),
         conditionLabel:
           result.item.conditionGrade === null
             ? "写真からの外観評価：判定できません"
@@ -400,14 +415,7 @@ export function buildRuleResultSpec(
       });
     } else if (block === "checklist") {
       add("checklist", "ChecklistCard", {
-        title:
-          result.selectedAction === "keep"
-            ? "引っ越し前のチェックリスト"
-            : result.selectedAction === "sell"
-              ? "売却前のチェックリスト"
-              : result.selectedAction === "give"
-                ? "譲渡前のチェックリスト"
-                : "処分前の確認事項",
+        title: "次にすること",
         items: categoryChecklist(result),
       });
     } else if (block === "action-cta") {
@@ -431,7 +439,7 @@ export function buildRuleResultSpec(
       });
     } else if (block === "packing-advice") {
       add("packing-advice", "PackingAdviceCard", {
-        title: isMusicalInstrument(result)
+        title: isMusicalInstrumentName(result.item.name)
           ? "楽器の梱包・運搬"
           : result.item.category === "books"
             ? "本・教材の梱包"

@@ -1,44 +1,75 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ActionSelector } from "../recognition/ActionSelector";
-import { RecognitionResult } from "../recognition/RecognitionResult";
-import { RuleResultView } from "../services/RuleResultView";
+import { displayItemCategory } from "../../lib/item-category";
+import { isItemUnidentified } from "../../lib/recognition-workflow";
 import {
+  ITEM_CATEGORIES,
   AnalyzeResponseSchema,
   type Action,
   type AnalyzeResponse,
   type ItemCategory,
-  type RecognizedItem,
 } from "../../types/recognition";
-import {
-  RuleResultSchema,
-  type RuleResult,
-} from "../../server/rules/schemas";
+import type { RuleResult } from "../../server/rules/schemas";
 
 interface InventoryItem {
   id: string;
   imageUrl: string;
   name: string | null;
   category: ItemCategory | null;
-  conditionGrade: RecognizedItem["condition"]["grade"];
-  observations: string[];
-  recommendedAction: Action | null;
-  recommendationReason: string | null;
-  selectedAction: Action | null;
-  analysisStatus: "pending" | "processing" | "succeeded" | "failed";
+  conditionGrade: number | null;
   status: "pending" | "in_progress" | "completed";
-  updatedAt: string;
+  analysisStatus: "pending" | "processing" | "succeeded" | "failed";
+  capturedAt: string;
 }
 
 interface InventoryItemFlowProps {
   initialItem: InventoryItem;
   initialRecognition: AnalyzeResponse | null;
+  initialSelectedAction: Action | null;
   initialResult: RuleResult | null;
 }
 
-function errorMessage(payload: unknown, fallback: string): string {
+const ACTION_LABELS: Record<Action, string> = {
+  keep: "保管する",
+  sell: "売る",
+  give: "譲る",
+  dispose: "処分する",
+};
+
+function itemStatus(status: InventoryItem["status"]) {
+  if (status === "completed") {
+    return { label: "完了", className: "inventory-status-completed" };
+  }
+  if (status === "in_progress") {
+    return { label: "対応中", className: "inventory-status-in-progress" };
+  }
+  return { label: "未整理", className: "inventory-status-pending" };
+}
+
+function isRecommendationOutdated(
+  item: InventoryItem,
+  recognition: AnalyzeResponse,
+): boolean {
+  const basis = recognition.recommendationBasis ?? recognition.item;
+  return (
+    item.name !== basis.name ||
+    item.category !== basis.category ||
+    item.conditionGrade !== basis.condition.grade
+  );
+}
+
+function formatCapturedAt(value: string): string {
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date(value));
+}
+
+function apiErrorMessage(payload: unknown, fallback: string): string {
   if (
     typeof payload === "object" &&
     payload !== null &&
@@ -53,89 +84,120 @@ function errorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-function errorCode(payload: unknown): string | null {
-  if (
-    typeof payload === "object" &&
-    payload !== null &&
-    "error" in payload &&
-    typeof payload.error === "object" &&
-    payload.error !== null &&
-    "code" in payload.error &&
-    typeof payload.error.code === "string"
-  ) {
-    return payload.error.code;
+function ItemFactIcon({ type }: { type: "category" | "condition" | "date" }) {
+  if (type === "category") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 5h16v14H4z" />
+        <path d="M8 9h8M8 13h5" />
+      </svg>
+    );
   }
-  return null;
+  if (type === "condition") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 19v-5M10 19V9M15 19V5M20 19v-8" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="6" width="16" height="14" rx="2" />
+      <path d="M8 4v4M16 4v4M4 10h16" />
+    </svg>
+  );
 }
 
 export function InventoryItemFlow({
   initialItem,
   initialRecognition,
+  initialSelectedAction,
   initialResult,
 }: InventoryItemFlowProps) {
   const router = useRouter();
   const [item, setItem] = useState(initialItem);
   const [recognition, setRecognition] = useState(initialRecognition);
-  const [result, setResult] = useState<RuleResult | null>(initialResult);
-  const [selectedAction, setSelectedAction] = useState<Action | null>(
-    initialResult?.selectedAction ?? initialItem.selectedAction,
+  const [analysisStatus, setAnalysisStatus] = useState(initialItem.analysisStatus);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [showManualCorrection, setShowManualCorrection] = useState(false);
+  const [manualName, setManualName] = useState(initialItem.name ?? "");
+  const [manualCategory, setManualCategory] = useState<ItemCategory | "">(
+    initialItem.category ?? "",
   );
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const autoAnalysisStarted = useRef(false);
+  const [savingManualCorrection, setSavingManualCorrection] = useState(false);
+  const [manualCorrectionError, setManualCorrectionError] = useState<string | null>(
+    null,
+  );
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const analysisAttempted = useRef(false);
+  const analysisRequestInFlight = useRef(false);
+  const status = itemStatus(item.status);
+  const recommendation = recognition?.recommendation;
+  const recognitionUnidentified = isItemUnidentified(recognition);
+  const canManuallyCorrect =
+    recognitionUnidentified ||
+    (analysisStatus === "failed" && recognition === null);
+  const recommendationIsCurrent =
+    recognition !== null &&
+    !recognitionUnidentified &&
+    recommendation?.action !== null &&
+    recommendation !== undefined &&
+    !isRecommendationOutdated(item, recognition);
 
-  async function runAnalysis() {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
+  useEffect(() => {
+    setItem(initialItem);
+    setRecognition(initialRecognition);
+    setAnalysisStatus(initialRecognition ? "succeeded" : initialItem.analysisStatus);
+    setManualName(initialItem.name ?? "");
+    setManualCategory(initialItem.category ?? "");
+    if (initialRecognition) setAnalysisError(null);
+  }, [initialItem, initialRecognition]);
+
+  const runAnalysis = useCallback(async () => {
+    if (analysisRequestInFlight.current) return;
+    analysisRequestInFlight.current = true;
+    setAnalysisLoading(true);
+    setAnalysisError(null);
+    setAnalysisStatus("processing");
     try {
       const response = await fetch(`/api/items/${item.id}/analyze`, {
         method: "POST",
       });
       const payload: unknown = await response.json();
       if (!response.ok) {
-        if (errorCode(payload) === "ANALYSIS_ALREADY_STARTED") {
-          setItem((current) => ({ ...current, analysisStatus: "processing" }));
-          setError(errorMessage(payload, "別の画面で分析中です。"));
+        if (
+          response.status === 409 &&
+          typeof payload === "object" &&
+          payload !== null &&
+          "error" in payload &&
+          typeof payload.error === "object" &&
+          payload.error !== null &&
+          "code" in payload.error &&
+          payload.error.code === "ANALYSIS_ALREADY_STARTED"
+        ) {
+          setAnalysisStatus("processing");
           return;
         }
-        throw new Error(errorMessage(payload, "AI分析を完了できませんでした。"));
+        throw new Error(
+          apiErrorMessage(payload, "写真を識別できませんでした。もう一度お試しください。"),
+        );
       }
       if (
         typeof payload !== "object" ||
         payload === null ||
-        !("item" in payload)
+        !("item" in payload) ||
+        typeof payload.item !== "object" ||
+        payload.item === null
       ) {
-        throw new Error("AI分析の結果を読み取れませんでした。");
+        throw new Error("保存された識別結果を読み取れませんでした。");
       }
-      const record = payload.item;
-      if (typeof record !== "object" || record === null) {
-        throw new Error("AI分析の結果を読み取れませんでした。");
-      }
-      const parsed = AnalyzeResponseSchema.safeParse({
-        item: {
-          name: "name" in record ? record.name : undefined,
-          category: "category" in record ? record.category : undefined,
-          condition: {
-            grade: "condition_grade" in record ? record.condition_grade : null,
-            observations: "observations" in record ? record.observations : [],
-            needsUserConfirmation: true,
-          },
-        },
-        recommendation: {
-          action:
-            "recommended_action" in record
-              ? record.recommended_action
-              : undefined,
-          reason:
-            "recommendation_reason" in record
-              ? record.recommendation_reason
-              : undefined,
-        },
-      });
+      const record = payload.item as Record<string, unknown>;
+      const parsed = AnalyzeResponseSchema.safeParse(record.recognition_result);
       if (!parsed.success) {
-        throw new Error("AI分析の結果を正しく読み取れませんでした。");
+        throw new Error("識別結果の形式を確認できませんでした。");
       }
       setRecognition(parsed.data);
       setItem((current) => ({
@@ -143,333 +205,385 @@ export function InventoryItemFlow({
         name: parsed.data.item.name,
         category: parsed.data.item.category,
         conditionGrade: parsed.data.item.condition.grade,
-        observations: parsed.data.item.condition.observations,
-        recommendedAction: parsed.data.recommendation.action,
-        recommendationReason: parsed.data.recommendation.reason,
         analysisStatus: "succeeded",
       }));
-      setSelectedAction(null);
-      setResult(null);
+      setAnalysisStatus("succeeded");
       router.refresh();
-    } catch (analysisError) {
-      setError(
-        analysisError instanceof Error
-          ? analysisError.message
-          : "AI分析を完了できませんでした。時間をおいて再度お試しください。",
+    } catch (error) {
+      setAnalysisStatus("failed");
+      setAnalysisError(
+        error instanceof Error
+          ? error.message
+          : "写真を識別できませんでした。時間をおいて再度お試しください。",
       );
-      setItem((current) => ({ ...current, analysisStatus: "failed" }));
     } finally {
-      setBusy(false);
+      analysisRequestInFlight.current = false;
+      setAnalysisLoading(false);
     }
-  }
+  }, [item.id, router]);
 
   useEffect(() => {
-    if (
-      item.analysisStatus === "pending" &&
-      !autoAnalysisStarted.current
-    ) {
-      autoAnalysisStarted.current = true;
-      void runAnalysis();
-    }
-  }, [item.analysisStatus]);
+    if (initialItem.analysisStatus !== "pending" || analysisAttempted.current) return;
+    analysisAttempted.current = true;
+    void runAnalysis();
+  }, [initialItem.analysisStatus, runAnalysis]);
 
-  const recognizedItem: RecognizedItem | null =
-    item.name && item.category
-      ? {
-          name: item.name,
-          category: item.category,
-          condition: {
-            grade: item.conditionGrade,
-            observations: item.observations,
-            needsUserConfirmation: false,
-          },
-        }
-      : null;
-  const hasEdits =
-    recognition !== null &&
-    recognizedItem !== null &&
-    (recognition.item.name !== recognizedItem.name ||
-      recognition.item.category !== recognizedItem.category ||
-      recognition.item.condition.grade !== recognizedItem.condition.grade ||
-      JSON.stringify(recognition.item.condition.observations) !==
-        JSON.stringify(recognizedItem.condition.observations));
+  useEffect(() => {
+    if (analysisStatus !== "processing" || analysisLoading) return;
+    const timer = window.setInterval(() => router.refresh(), 2000);
+    return () => window.clearInterval(timer);
+  }, [analysisLoading, analysisStatus, router]);
 
-  async function saveEdits() {
-    if (!recognizedItem || busy) return;
-    setBusy(true);
-    setError(null);
+  async function saveManualCorrection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!manualName.trim() || !manualCategory || savingManualCorrection) return;
+    setSavingManualCorrection(true);
+    setManualCorrectionError(null);
     try {
       const response = await fetch(`/api/items/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: recognizedItem.name,
-          category: recognizedItem.category,
-          conditionGrade: recognizedItem.condition.grade,
-          observations: recognizedItem.condition.observations,
+          name: manualName.trim(),
+          category: manualCategory,
+          conditionGrade: null,
+          observations: [],
         }),
       });
       const payload: unknown = await response.json();
       if (!response.ok) {
-        throw new Error(errorMessage(payload, "物品情報を保存できませんでした。"));
+        throw new Error(
+          apiErrorMessage(payload, "物品情報を保存できませんでした。"),
+        );
       }
-      setRecognition((current) =>
-        current
-          ? {
-              ...current,
-              item: recognizedItem,
-            }
-          : current,
-      );
-      setSaved(true);
-    } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "物品情報を保存できませんでした。",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function savePlan() {
-    if (!selectedAction || busy) return;
-    setBusy(true);
-    setError(null);
-    setSaved(false);
-    try {
-      const response = await fetch(`/api/items/${item.id}/plan`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedAction }),
-      });
-      const payload: unknown = await response.json();
-      if (!response.ok) {
-        throw new Error(errorMessage(payload, "整理プランを作成できませんでした。"));
-      }
-      if (typeof payload !== "object" || payload === null || !("result" in payload)) {
-        throw new Error("整理プランの結果を読み取れませんでした。");
-      }
-      const parsed = RuleResultSchema.safeParse(payload.result);
-      if (!parsed.success) {
-        throw new Error("整理プランの形式を確認できませんでした。");
-      }
-      setResult(parsed.data);
       setItem((current) => ({
         ...current,
-        selectedAction: parsed.data.selectedAction,
-        status: "in_progress",
+        name: manualName.trim(),
+        category: manualCategory,
+        conditionGrade: null,
       }));
-      setSaved(true);
+      setShowManualCorrection(false);
       router.refresh();
-    } catch (planError) {
-      setError(
-        planError instanceof Error
-          ? planError.message
-          : "整理プランを作成できませんでした。",
+    } catch (error) {
+      setManualCorrectionError(
+        error instanceof Error ? error.message : "物品情報を保存できませんでした。",
       );
     } finally {
-      setBusy(false);
-    }
-  }
-
-  async function updateStatus(status: "in_progress" | "completed") {
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/items/${item.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      const payload: unknown = await response.json();
-      if (!response.ok) {
-        throw new Error(errorMessage(payload, "進捗を保存できませんでした。"));
-      }
-      setItem((current) => ({ ...current, status }));
-    } catch (statusError) {
-      setError(
-        statusError instanceof Error
-          ? statusError.message
-          : "進捗を保存できませんでした。",
-      );
-    } finally {
-      setBusy(false);
+      setSavingManualCorrection(false);
     }
   }
 
   async function deleteItem() {
-    if (busy || !window.confirm("この持ち物と写真を削除しますか？")) return;
-    setBusy(true);
-    setError(null);
+    if (deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
     try {
-      const response = await fetch(`/api/items/${item.id}`, { method: "DELETE" });
+      const response = await fetch(`/api/items/${initialItem.id}`, {
+        method: "DELETE",
+      });
       const payload: unknown = await response.json();
       if (!response.ok) {
-        throw new Error(errorMessage(payload, "持ち物を削除できませんでした。"));
+        throw new Error(
+          typeof payload === "object" &&
+            payload !== null &&
+            "error" in payload &&
+            typeof payload.error === "object" &&
+            payload.error !== null &&
+            "message" in payload.error &&
+            typeof payload.error.message === "string"
+            ? payload.error.message
+            : "持ち物を削除できませんでした。時間をおいて再度お試しください。",
+        );
+      }
+      if (
+        typeof payload !== "object" ||
+        payload === null ||
+        !("deleted" in payload) ||
+        payload.deleted !== true
+      ) {
+        throw new Error("削除結果を確認できませんでした。");
       }
       router.replace("/items");
       router.refresh();
-    } catch (deleteError) {
-      setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "持ち物を削除できませんでした。",
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "持ち物を削除できませんでした。時間をおいて再度お試しください。",
       );
-      setBusy(false);
+    } finally {
+      setDeleting(false);
     }
   }
 
   return (
-    <section className="inventory-detail" aria-labelledby="item-detail-title">
-      <a href="/items" className="inventory-back-link">← 持ち物一覧</a>
-      <div className="inventory-detail-heading">
-        <h1 id="item-detail-title">
-          {item.name ?? "写真を分析しています"}
-        </h1>
-        {item.analysisStatus === "succeeded" && (
-          <p>内容を確認して、これからの整理方法を選んでください。</p>
-        )}
-      </div>
+    <section className="inventory-detail">
+      <a className="inventory-back-link" href="/items">
+        ← 持ち物一覧
+      </a>
 
-      {item.analysisStatus !== "succeeded" && (
-        <section className="inventory-analysis-panel" aria-live="polite">
-          <img src={item.imageUrl} alt="登録した持ち物" />
-          {item.analysisStatus === "processing" || busy ? (
-            <>
-              <p role="status">写真をAIが分析しています…</p>
-              {!busy && (
-                <button
-                  type="button"
-                  className="inventory-secondary"
-                  onClick={() => router.refresh()}
-                >
-                  状態を更新する
-                </button>
-              )}
-            </>
-          ) : item.analysisStatus === "failed" ? (
-            <>
-              <p>分析できませんでした。写真は保存されています。もう一度お試しください。</p>
-              <button
-                type="button"
-                className="account-primary"
-                disabled={busy}
-                onClick={() => void runAnalysis()}
-              >
-                AI分析を再試行する <span aria-hidden="true">→</span>
-              </button>
-            </>
-          ) : (
-            <p role="status">AI分析を準備しています…</p>
-          )}
-        </section>
-      )}
-
-      {recognizedItem && recognition && (
-        <>
-          <RecognitionResult
-            item={recognizedItem}
-            photoUrl={item.imageUrl}
-            readOnly={item.selectedAction !== null}
-            isEdited={hasEdits}
-            isManualEntry={false}
-            onNameChange={(name) => {
-              setItem((current) => ({ ...current, name }));
-              setSaved(false);
-            }}
-            onCategoryChange={(category: ItemCategory) => {
-              setItem((current) => ({ ...current, category }));
-              setSaved(false);
-            }}
-            onGradeChange={(conditionGrade) => {
-              setItem((current) => ({ ...current, conditionGrade }));
-              setSaved(false);
-            }}
-          />
-          {hasEdits && (
-            <button
-              type="button"
-              className="inventory-secondary"
-              disabled={busy}
-              onClick={() => void saveEdits()}
+      <article className="inventory-item-summary">
+        <img src={item.imageUrl} alt={item.name ?? "登録した持ち物"} />
+        <div className="inventory-item-summary-copy">
+          <div className="inventory-item-summary-title">
+            <h1>
+              {recognitionUnidentified
+                ? "識別できませんでした"
+                : item.name ??
+                  (analysisStatus === "failed"
+                    ? "識別できませんでした"
+                    : "AI識別中…")}
+            </h1>
+            <span className={`inventory-status ${status.className}`}>
+              {status.label}
+            </span>
+          </div>
+          <dl className="inventory-item-facts">
+            <div>
+              <dt>
+                <ItemFactIcon type="category" />
+                カテゴリ
+              </dt>
+              <dd>
+                {item.category && !recognitionUnidentified
+                  ? displayItemCategory(
+                      item.category,
+                      item.name ?? "",
+                    )
+                  : analysisStatus === "failed" || recognitionUnidentified
+                    ? "未識別"
+                    : "識別中"}
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <ItemFactIcon type="condition" />
+                状態の目安
+              </dt>
+              <dd>
+                {item.conditionGrade === null || recognitionUnidentified
+                  ? analysisStatus === "failed" || recognitionUnidentified
+                    ? "未判定"
+                    : "識別中"
+                  : `${item.conditionGrade} / 5`}
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <ItemFactIcon type="date" />
+                撮影日
+              </dt>
+              <dd>{formatCapturedAt(item.capturedAt)}</dd>
+            </div>
+          </dl>
+          {(analysisStatus !== "succeeded" ||
+            analysisLoading ||
+            recognitionUnidentified) && (
+            <div
+              className={`inventory-analysis-state${analysisStatus === "failed" ? " is-error" : ""}`}
+              role={analysisStatus === "failed" ? "alert" : "status"}
+              aria-live="polite"
             >
-              {busy ? "保存しています…" : "変更した内容を保存"}
-            </button>
-          )}
-          {saved && <p className="inventory-saved" role="status">保存しました。</p>}
-          <ActionSelector
-            recommendation={recognition.recommendation.action}
-            reason={recognition.recommendation.reason}
-            recommendationStale={hasEdits}
-            selectedAction={selectedAction}
-            onSelect={(action) => {
-              setSelectedAction(action);
-              if (result && action !== result.selectedAction) setResult(null);
-            }}
-          />
-          <button
-            type="button"
-            className="account-primary"
-            disabled={!selectedAction || busy || hasEdits}
-            onClick={() => void savePlan()}
-          >
-            {busy
-              ? "案内を作成しています…"
-              : result
-                ? "選んだ方法にプランを更新"
-                : "この方法で進める"}
-            {!busy && <span aria-hidden="true">→</span>}
-          </button>
-          {result && (
-            <div className="inventory-result">
-              <RuleResultView
-                result={result}
-                loading={false}
-                error={null}
-                onRetry={() => void savePlan()}
-              />
-              <div className="inventory-progress-actions">
-                <p>
-                  現在の状態：
-                  {item.status === "completed"
-                    ? "完了"
-                    : "進行中"}
-                </p>
-                {item.status === "completed" ? (
+              <strong>
+                {analysisLoading || analysisStatus === "processing"
+                  ? "AI識別中…"
+                  : analysisStatus === "failed"
+                    ? "識別できませんでした"
+                    : recognitionUnidentified
+                      ? "AIでは物品を特定できませんでした"
+                      : "まだAI識別していません"}
+              </strong>
+              <p>
+                写真は保存されています。
+                {analysisStatus === "failed"
+                  ? "識別を再試行するか、物品名とカテゴリを入力してください。"
+                  : recognitionUnidentified
+                    ? "物品名とカテゴリを確認して入力してください。"
+                    : ""}
+              </p>
+              {analysisError && <p>{analysisError}</p>}
+              {canManuallyCorrect && (
+                <div className="inventory-analysis-actions">
+                  {analysisStatus === "failed" && (
+                    <button
+                      className="inventory-secondary"
+                      type="button"
+                      disabled={analysisLoading}
+                      onClick={() => {
+                        analysisAttempted.current = true;
+                        void runAnalysis();
+                      }}
+                    >
+                      {analysisLoading ? "識別中…" : "もう一度認識する"}
+                    </button>
+                  )}
+                  {(analysisStatus === "failed" || recognitionUnidentified) && (
+                    <button
+                      className="inventory-analysis-edit-link"
+                      type="button"
+                      onClick={() => {
+                        setManualCorrectionError(null);
+                        setManualName(item.name ?? "");
+                        setManualCategory(item.category ?? "");
+                        setShowManualCorrection((shown) => !shown);
+                      }}
+                    >
+                      {showManualCorrection ? "入力を閉じる" : "物品名・カテゴリを入力"}
+                    </button>
+                  )}
+                </div>
+              )}
+              {showManualCorrection &&
+                canManuallyCorrect && (
+                <form
+                  className="inventory-manual-correction"
+                  onSubmit={saveManualCorrection}
+                >
+                  <label>
+                    <span>物品名</span>
+                    <input
+                      autoComplete="off"
+                      maxLength={100}
+                      required
+                      value={manualName}
+                      onChange={(event) => setManualName(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>カテゴリ</span>
+                    <select
+                      required
+                      value={manualCategory}
+                      onChange={(event) =>
+                        setManualCategory(
+                          ITEM_CATEGORIES.find(
+                            (category) => category === event.target.value,
+                          ) ?? "",
+                        )
+                      }
+                    >
+                      <option value="">選択してください</option>
+                      {ITEM_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {displayItemCategory(category, manualName)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {manualCorrectionError && (
+                    <p role="alert">{manualCorrectionError}</p>
+                  )}
                   <button
-                    type="button"
                     className="inventory-secondary"
-                    disabled={busy}
-                    onClick={() => void updateStatus("in_progress")}
+                    type="submit"
+                    disabled={
+                      savingManualCorrection || !manualName.trim() || !manualCategory
+                    }
                   >
-                    もう一度進行中にする
+                    {savingManualCorrection ? "保存中…" : "物品情報を保存"}
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="inventory-secondary"
-                    disabled={busy}
-                    onClick={() => void updateStatus("completed")}
-                  >
-                    整理を完了にする
-                  </button>
-                )}
-              </div>
+                </form>
+              )}
             </div>
           )}
-        </>
-      )}
-      {error && <p className="account-error" role="alert">{error}</p>}
-      <button
-        type="button"
-        className="inventory-delete"
-        disabled={busy}
-        onClick={() => void deleteItem()}
-      >
-        この持ち物を削除
-      </button>
+          {analysisStatus === "succeeded" &&
+            recognition &&
+            !recognitionUnidentified &&
+            recommendationIsCurrent &&
+            recommendation && (
+            <aside className="inventory-ai-recommendation">
+              <span className="inventory-ai-recommendation-label">
+                AIのおすすめ
+              </span>
+              <span className="inventory-ai-recommendation-icon" aria-hidden="true">
+                ✦
+              </span>
+              <div>
+                <strong>
+                  {recommendation.action && ACTION_LABELS[recommendation.action]}
+                </strong>
+                <p>{recommendation.reason}</p>
+              </div>
+            </aside>
+          )}
+          {initialResult && initialSelectedAction && (
+            <div className="inventory-saved-plan-summary">
+              <span>保存済みの整理プラン</span>
+              <strong>{ACTION_LABELS[initialSelectedAction]}</strong>
+              <p>{initialResult.guidance.title}</p>
+            </div>
+          )}
+        </div>
+      </article>
+
+      <section className="inventory-delete-area" aria-label="持ち物の削除">
+        {!confirmDelete ? (
+          <button
+            className="inventory-delete-trigger"
+            type="button"
+            onClick={() => {
+              setDeleteError(null);
+              setConfirmDelete(true);
+            }}
+          >
+            この持ち物を削除する
+          </button>
+        ) : (
+          <div
+            className="inventory-delete-confirmation"
+            role="group"
+            aria-labelledby="inventory-delete-title"
+            aria-describedby="inventory-delete-description"
+          >
+            <h2 id="inventory-delete-title">この持ち物を削除しますか？</h2>
+            <p id="inventory-delete-description">
+              写真と保存済みの整理プランも削除されます。この操作は取り消せません。
+            </p>
+            {deleteError && (
+              <p className="inventory-delete-error" role="alert">
+                {deleteError}
+              </p>
+            )}
+            <div className="inventory-delete-confirm-actions">
+              <button
+                className="inventory-delete-cancel"
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirmDelete(false)}
+              >
+                キャンセル
+              </button>
+              <button
+                className="inventory-delete-confirm"
+                type="button"
+                disabled={deleting}
+                onClick={() => void deleteItem()}
+              >
+                {deleting ? "削除中…" : "削除する"}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="inventory-detail-cta-dock">
+        <button
+          className="inventory-detail-primary"
+          type="button"
+          onClick={() => router.push(`/items/${item.id}/consult`)}
+        >
+          {item.status === "completed" ? (
+            <>整理結果を見る →</>
+          ) : item.status === "in_progress" ? (
+            <>整理プランを見る →</>
+          ) : (
+            <>
+              <span aria-hidden="true">✦</span>
+              AIに相談する
+            </>
+          )}
+        </button>
+      </div>
     </section>
   );
 }

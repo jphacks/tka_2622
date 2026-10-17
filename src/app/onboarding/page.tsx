@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { OnboardingForm } from "../../components/account/OnboardingForm";
+import { Brand } from "../../components/account/Brand";
 import { requirePageUser, getSupabaseServerClient } from "../../lib/supabase/server";
 
 export default async function OnboardingPage() {
@@ -18,8 +19,8 @@ export default async function OnboardingPage() {
   return (
     <main className="account-stage onboarding-stage">
       <header className="account-header">
-        <a className="account-wordmark" href="/" aria-label="よりみち">
-          よりみち
+        <a className="account-wordmark" href="/" aria-label="ものさき。">
+          <Brand />
         </a>
         <span className="account-header-note">はじめに</span>
       </header>

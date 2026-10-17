@@ -10,6 +10,10 @@ interface RuleResultViewProps {
   loading: boolean;
   error: string | null;
   onRetry: () => void;
+  showRecommendation?: boolean;
+  showItemSummary?: boolean;
+  showActionCta?: boolean;
+  stepsFirst?: boolean;
 }
 
 export function RuleResultView({
@@ -17,6 +21,10 @@ export function RuleResultView({
   loading,
   error,
   onRetry,
+  showRecommendation = true,
+  showItemSummary = true,
+  showActionCta = true,
+  stepsFirst = false,
 }: RuleResultViewProps) {
   if (loading) {
     return (
@@ -50,7 +58,12 @@ export function RuleResultView({
     );
   }
 
-  const spec = buildRuleResultSpec(result);
+  const spec = buildRuleResultSpec(result, undefined, {
+    showRecommendation,
+    showItemSummary,
+    showActionCta,
+    stepsFirst,
+  });
   return (
     <JSONUIProvider registry={ruleUiRegistry}>
       <Renderer spec={spec} registry={ruleUiRegistry} />

@@ -3,6 +3,7 @@ import { POST } from "../src/app/api/rules/evaluate/route";
 import { evaluateRules } from "../src/server/rules/engine";
 import type { RuleServiceProvider } from "../src/server/rules/providers/types";
 import type { ServiceBusiness } from "../src/types/service";
+import { buildRuleResultSpec } from "../src/lib/rule-ui/spec-builder";
 
 function service(
   id: string,
@@ -194,6 +195,89 @@ describe("Rule Engine", () => {
     expect(result.recommendationReason).toContain("十分に確認できない");
     expect(result.recommendedAction).toBe("give");
     expect(result.selectedAction).toBe("give");
+  });
+
+  it("uses saved recommendations and item-specific guidance for guitar, book, refrigerator, and chair", async () => {
+    const cases = [
+      {
+        name: "エレクトリックギター",
+        category: "electronics" as const,
+        conditionGrade: 4 as const,
+        action: "keep" as const,
+        reason: "ケースに収めて運ぶ方法が適しています。",
+        guideIncludes: "ネックやボディ",
+      },
+      {
+        name: "参考書",
+        category: "books" as const,
+        conditionGrade: 2 as const,
+        action: "sell" as const,
+        reason: "書き込みの状態を確認してから査定を相談できます。",
+        guideIncludes: "書き込みや付属資料",
+      },
+      {
+        name: "冷蔵庫",
+        category: "electronics" as const,
+        conditionGrade: null,
+        action: "dispose" as const,
+        reason: "家電リサイクルの対象か公式案内を確認してください。",
+        guideIncludes: "家電リサイクル法",
+      },
+      {
+        name: "ダイニングチェア",
+        category: "furniture" as const,
+        conditionGrade: 3 as const,
+        action: "give" as const,
+        reason: "椅子の状態と受け渡し条件を相手に伝えられます。",
+        guideIncludes: "椅子の脚・背もたれ",
+      },
+    ];
+    const results = await Promise.all(
+      cases.map(({ name, category, conditionGrade, action, reason }) =>
+        evaluateRules({
+          item: { name, category, conditionGrade, observations: [] },
+          aiRecommendedAction: action,
+          aiRecommendationReason: reason,
+        }),
+      ),
+    );
+    const guideDetails = results.map((result) => {
+      const spec = buildRuleResultSpec(result, undefined, {
+        showRecommendation: false,
+        showItemSummary: false,
+        showActionCta: false,
+      });
+      return Object.values(spec.elements).filter((element) =>
+        ["ActionGuideCard", "ChecklistCard", "PackingAdviceCard", "DisposalVerificationCard"].includes(
+          element.type,
+        ),
+      );
+    });
+
+    expect(results.map(({ recommendedAction, selectedAction }) => [
+      recommendedAction,
+      selectedAction,
+    ])).toEqual([
+      ["keep", "keep"],
+      ["sell", "sell"],
+      ["dispose", "dispose"],
+      ["give", "give"],
+    ]);
+    for (const [index, result] of results.entries()) {
+      expect(result.recommendationReason).toContain(cases[index].reason);
+      expect(result.recommendationReason).toContain("状態や条件は実物で確認");
+    }
+    expect(results[0].item.category).toBe("other");
+    expect(guideDetails.map((details) => JSON.stringify(details))).toEqual(
+      expect.arrayContaining(cases.map(({ guideIncludes }) =>
+        expect.stringContaining(guideIncludes),
+      )),
+    );
+    expect(
+      guideDetails.every((details) =>
+        details.every((element) => element.type !== "ItemSummaryCard"),
+      ),
+    ).toBe(true);
   });
 
   it("returns an honest empty sell state without a real service provider", async () => {

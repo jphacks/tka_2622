@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { MovingHomeIllustration } from "../../components/account/MovingHomeIllustration";
+import { Brand } from "../../components/account/Brand";
 import { getSupabaseBrowserClient } from "../../lib/supabase/browser";
 
 export default function LoginPage() {
@@ -78,12 +79,15 @@ export default function LoginPage() {
   return (
     <main className="login-stage">
       <section className="login-hero" aria-labelledby="login-title">
-        <h1 id="login-title">JPHACK</h1>
-        <p>引っ越しをもっとかんたんに</p>
+        <h1 id="login-title"><Brand /></h1>
+        <p>モノの次を、見つけよう。</p>
         <MovingHomeIllustration />
       </section>
       <section className="login-panel" aria-label="ログイン">
+        <h2>ログイン</h2>
+        <p className="login-panel-description">持ち物の整理を、ここから。</p>
         <form className="login-form" onSubmit={handleSubmit}>
+          <span className="login-field-label" id="login-email-label">メールアドレス</span>
           <label className="login-input">
             <span className="visually-hidden">メールアドレス</span>
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -92,6 +96,9 @@ export default function LoginPage() {
             </svg>
             <input
               type="email"
+              aria-labelledby="login-email-label"
+              autoCapitalize="none"
+              spellCheck={false}
               autoComplete="email"
               required
               placeholder="メールアドレス"
@@ -99,6 +106,7 @@ export default function LoginPage() {
               onChange={(event) => setEmail(event.currentTarget.value)}
             />
           </label>
+          <span className="login-field-label" id="login-password-label">パスワード</span>
           <label className="login-input">
             <span className="visually-hidden">パスワード</span>
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -107,6 +115,7 @@ export default function LoginPage() {
             </svg>
             <input
               type="password"
+              aria-labelledby="login-password-label"
               autoComplete="current-password"
               required
               placeholder="パスワード"
@@ -119,7 +128,7 @@ export default function LoginPage() {
               {error}
             </p>
           )}
-          <button className="login-submit" type="submit" disabled={submitting}>
+          <button className="login-submit" type="submit" disabled={submitting} aria-busy={submitting}>
             {submitting ? "確認しています…" : "ログイン"}
             {!submitting && <span aria-hidden="true">→</span>}
           </button>

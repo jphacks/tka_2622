@@ -35,7 +35,7 @@ function getItemStatus(item: InventoryItem): {
     return { label: "要確認", kind: "attention" };
   }
   if (item.status === "completed") {
-    return { label: "整理済み", kind: "completed" };
+    return { label: "完了", kind: "completed" };
   }
   if (item.status === "in_progress") {
     return { label: "対応中", kind: "in-progress" };

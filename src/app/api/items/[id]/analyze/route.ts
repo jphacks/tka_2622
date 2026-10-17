@@ -4,6 +4,7 @@ import {
   getSupabaseServerClient,
   requireApiUser,
 } from "../../../../../lib/supabase/server";
+import { AnalyzeResponseSchema } from "../../../../../types/recognition";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,11 @@ async function markAnalysisFailed(
     .eq("id", itemId)
     .eq("user_id", userId)
     .eq("analysis_status", "processing");
-  if (error) console.error("Could not mark item analysis as failed.", error);
+  if (error) {
+    console.error("Could not mark item analysis as failed.", {
+      code: error.code ?? "UNKNOWN",
+    });
+  }
 }
 
 export async function POST(
@@ -51,7 +56,9 @@ export async function POST(
     .select("id, image_path")
     .maybeSingle();
   if (claimError) {
-    console.error("Could not claim item analysis.", claimError);
+    console.error("Could not claim item analysis.", {
+      code: claimError.code ?? "UNKNOWN",
+    });
     return errorResponse(
       "ANALYSIS_START_FAILED",
       "分析を開始できませんでした。時間をおいて再度お試しください。",
@@ -63,12 +70,16 @@ export async function POST(
   if (!claimed) {
     const { data: current, error: currentError } = await auth.supabase
       .from("user_items")
-      .select("analysis_status, updated_at")
+      .select(
+        "id, name, category, condition_grade, observations, recognition_result, recommended_action, recommendation_reason, analysis_status, status, selected_action, updated_at",
+      )
       .eq("id", id)
       .eq("user_id", auth.user.id)
       .maybeSingle();
     if (currentError) {
-      console.error("Could not inspect the current item analysis status.", currentError);
+      console.error("Could not inspect the current item analysis status.", {
+        code: currentError.code ?? "UNKNOWN",
+      });
       return errorResponse(
         "ANALYSIS_STATUS_UNAVAILABLE",
         "分析状態を確認できませんでした。",
@@ -77,6 +88,23 @@ export async function POST(
     }
     if (!current) return errorResponse("ITEM_NOT_FOUND", "持ち物が見つかりません。", 404);
     observedStatus = current.analysis_status;
+    if (current.analysis_status === "succeeded") {
+      const recognition = AnalyzeResponseSchema.safeParse(
+        current.recognition_result,
+      );
+      if (!recognition.success) {
+        console.error("Saved item analysis failed schema validation", {
+          reason: "stored_schema_validation_failed",
+          issueCount: recognition.error.issues.length,
+        });
+        return errorResponse(
+          "ANALYSIS_RESULT_INVALID",
+          "保存された分析結果を読み取れませんでした。",
+          500,
+        );
+      }
+      return Response.json({ item: current });
+    }
     const staleBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     if (
       current.analysis_status === "processing" &&
@@ -94,7 +122,9 @@ export async function POST(
         .select("id, image_path")
         .maybeSingle();
       if (recoverError) {
-        console.error("Could not recover stale item analysis.", recoverError);
+        console.error("Could not recover stale item analysis.", {
+          code: recoverError.code ?? "UNKNOWN",
+        });
         return errorResponse(
           "ANALYSIS_STATUS_UNAVAILABLE",
           "分析状態を確認できませんでした。",
@@ -119,7 +149,9 @@ export async function POST(
     .download(claimed.image_path);
   if (downloadError || !image) {
     await markAnalysisFailed(auth.supabase, id, auth.user.id);
-    console.error("Could not load the private image for analysis.", downloadError);
+    console.error("Could not load the private image for analysis.", {
+      code: downloadError?.name ?? "IMAGE_UNAVAILABLE",
+    });
     return errorResponse(
       "IMAGE_LOAD_FAILED",
       "保存した写真を読み込めませんでした。写真を削除して再登録してください。",
@@ -170,7 +202,11 @@ export async function POST(
       )
       .maybeSingle();
     if (updateError || !data) {
-      if (updateError) console.error("Could not save the item analysis.", updateError);
+      if (updateError) {
+        console.error("Could not save the item analysis.", {
+          code: updateError.code ?? "UNKNOWN",
+        });
+      }
       await markAnalysisFailed(auth.supabase, id, auth.user.id);
       return errorResponse(
         "ANALYSIS_SAVE_FAILED",
@@ -188,9 +224,15 @@ export async function POST(
         AI_RESPONSE_INVALID: 502,
         SERVER_CONFIG_ERROR: 500,
       } as const;
+      console.error("Item recognition failed", {
+        code: error.code,
+        status: statusByCode[error.code],
+      });
       return errorResponse(error.code, error.message, statusByCode[error.code]);
     }
-    console.error("Unexpected item analysis failure.", error);
+    console.error("Unexpected item analysis failure.", {
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
     return errorResponse(
       "ANALYSIS_FAILED",
       "写真を分析できませんでした。時間をおいて再度お試しください。",
