@@ -767,8 +767,8 @@ export function InventoryConsultFlow({
             )}
 
             {selectedAction === "sell" && (
-              <section className="inventory-consult-station" aria-label="駅を選択">
-                <h2>買取店を探す駅</h2>
+              <details className="inventory-consult-station" open={!stationId}>
+                <summary>買取店を探す駅{stationId && stations.stations.find((station) => station.id === stationId) ? `：${stations.stations.find((station) => station.id === stationId)?.name}` : "を選択"}</summary>
                 <StationSelector
                   stations={stations.stations}
                   selectedStationId={stationId}
@@ -777,7 +777,7 @@ export function InventoryConsultFlow({
                   onSelect={stations.selectStation}
                   onRetry={() => void stations.loadStations()}
                 />
-              </section>
+              </details>
             )}
             <RuleResultView
               result={result}

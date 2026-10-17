@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AccountHeader } from "../../components/account/AccountHeader";
 import { InventoryCollection } from "../../components/inventory/InventoryCollection";
@@ -10,6 +11,8 @@ import {
   loadMovePlanSource,
 } from "../../server/move-plan-data";
 import { AnalyzeResponseSchema } from "../../types/recognition";
+
+export const metadata: Metadata = { title: "持ち物一覧" };
 
 export default async function ItemsPage() {
   const user = await requirePageUser();

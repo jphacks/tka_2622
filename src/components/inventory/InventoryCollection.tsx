@@ -131,7 +131,7 @@ export function InventoryCollection({
             </div>
             <div className="move-preparation-details">
               <p>
-                <span>実際に整理完了</span>
+                <span>整理完了</span>
                 <strong>{movePlan.completedItemCount} 件</strong>
               </p>
               <p>
@@ -149,10 +149,10 @@ export function InventoryCollection({
             </div>
             <Link className="move-preparation-link" href="/items/plan">
               {movePlan.needsUpdate
-                ? "整理プランを確認する"
+                ? "引っ越しプランを更新する"
                 : movePlan.hasPlan
-                  ? "整理プランを見る"
-                  : "整理プランへ進む"}
+                  ? "引っ越しプランを見る"
+                  : "引っ越しプランへ"}
               <span aria-hidden="true">›</span>
             </Link>
           </section>

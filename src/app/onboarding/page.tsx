@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { OnboardingForm } from "../../components/account/OnboardingForm";
 import { Brand } from "../../components/account/Brand";
 import { requirePageUser, getSupabaseServerClient } from "../../lib/supabase/server";
+
+export const metadata: Metadata = { title: "はじめの設定" };
 
 export default async function OnboardingPage() {
   const user = await requirePageUser();

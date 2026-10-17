@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { NewInventoryItemForm } from "../../../components/inventory/NewInventoryItemForm";
 import { Brand } from "../../../components/account/Brand";
 import {
@@ -5,6 +6,8 @@ import {
   requirePageUser,
 } from "../../../lib/supabase/server";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = { title: "写真を追加" };
 
 export default async function NewItemPage() {
   const user = await requirePageUser();

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { AccountHeader } from "../../../components/account/AccountHeader";
 import { InventoryItemFlow } from "../../../components/inventory/InventoryItemFlow";
@@ -7,6 +8,8 @@ import {
   getSupabaseServerClient,
   requirePageUser,
 } from "../../../lib/supabase/server";
+
+export const metadata: Metadata = { title: "持ち物詳細" };
 
 export default async function InventoryItemPage({
   params,

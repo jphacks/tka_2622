@@ -40,9 +40,9 @@ export function Pipeline2Flow({
   return (
     <main className="app-shell pipeline2-shell">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="よりみち ホーム">
+        <a className="brand" href="/" aria-label="ものさき。 ホーム">
           <span className="brand-mark" aria-hidden="true">y</span>
-          <span>よりみち</span>
+          <span>ものさき。</span>
         </a>
         <span className="topbar-note">引っ越し前の、持ち物整理。</span>
       </header>
@@ -98,7 +98,7 @@ export function Pipeline2Flow({
         />
       </div>
       <footer className="footer">
-        <span>よりみち</span>
+        <span>ものさき。</span>
         <span>暮らしを、少し軽やかに。</span>
       </footer>
     </main>

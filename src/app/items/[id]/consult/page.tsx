@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { AccountHeader } from "../../../../components/account/AccountHeader";
 import { InventoryConsultFlow } from "../../../../components/inventory/InventoryConsultFlow";
 import { getSupabaseServerClient, requirePageUser } from "../../../../lib/supabase/server";
 import { RuleResultSchema } from "../../../../server/rules/schemas";
 import { AnalyzeResponseSchema, ActionSchema } from "../../../../types/recognition";
+
+export const metadata: Metadata = { title: "AI相談・整理プラン" };
 
 export default async function InventoryItemConsultPage({
   params,

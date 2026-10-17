@@ -132,7 +132,6 @@ export function MovePlanPageClient({
         ← 持ち物一覧
       </Link>
       <header className="move-plan-heading">
-        <p className="move-plan-eyebrow">引っ越し準備</p>
         <h1 id="move-plan-title">引っ越し整理プラン</h1>
       </header>
 
@@ -157,7 +156,7 @@ export function MovePlanPageClient({
             </dd>
           </div>
           <div>
-            <dt>実際に整理が完了</dt>
+            <dt>整理が完了した持ち物</dt>
             <dd>
               {completedItemCount} / {totalItemCount} 件
             </dd>
@@ -165,11 +164,56 @@ export function MovePlanPageClient({
         </dl>
       </section>
 
-      <section className="move-plan-source" aria-labelledby="move-plan-source-title">
-        <div className="move-plan-section-heading">
-          <h2 id="move-plan-source-title">プランに含める持ち物</h2>
-          <span>{selectedItemCount} 件</span>
-        </div>
+      {shouldGenerate && (
+        <section className="move-plan-generation" aria-live="polite">
+          {isGenerating ? (
+            <div className="move-plan-loading" role="status">
+              <span className="move-plan-spinner" aria-hidden="true" />
+              <strong>引っ越し整理プランを作成しています…</strong>
+              <p>
+                持ち物ごとの整理方法をまとめ、引っ越しまでの予定を考えています。
+              </p>
+            </div>
+          ) : (
+            <>
+              <button
+                className="move-plan-generate-button"
+                type="button"
+                onClick={generatePlan}
+                disabled={selectedItemCount === 0 || !generationAvailable}
+                aria-describedby={
+                  generationAvailable ? undefined : "move-plan-migration-required"
+                }
+              >
+                {hasPlan
+                  ? "AIで整理プランを更新する"
+                  : "AIで整理プランを生成する"}
+              </button>
+              {!generationAvailable && (
+                <p
+                  id="move-plan-migration-required"
+                  className="move-plan-note"
+                  role="status"
+                >
+                  現在プランを作成できません。管理者にお問い合わせください。
+                </p>
+              )}
+            </>
+          )}
+          {errorMessage && (
+            <p className="move-plan-error" role="alert">
+              {errorMessage}
+            </p>
+          )}
+        </section>
+      )}
+
+
+      <details className="move-plan-source" open={!hasPlan}>
+        <summary className="move-plan-section-heading">
+          <h2 id="move-plan-source-title">持ち物と整理方法</h2>
+          <span>{selectedItemCount} 件が対象</span>
+        </summary>
         {items.length === 0 ? (
           <p className="move-plan-empty">
             持ち物がまだありません。写真を登録すると、整理プランに含められます。
@@ -217,58 +261,13 @@ export function MovePlanPageClient({
             保存済みの整理方法に変更があります。プランを更新してください。
           </p>
         )}
-      </section>
-
-      {shouldGenerate && (
-        <section className="move-plan-generation" aria-live="polite">
-          {isGenerating ? (
-            <div className="move-plan-loading" role="status">
-              <span className="move-plan-spinner" aria-hidden="true" />
-              <strong>引っ越し整理プランを作成しています…</strong>
-              <p>
-                持ち物ごとの整理方法をまとめ、引っ越しまでの予定を考えています。
-              </p>
-            </div>
-          ) : (
-            <>
-              <button
-                className="move-plan-generate-button"
-                type="button"
-                onClick={generatePlan}
-                disabled={selectedItemCount === 0 || !generationAvailable}
-                aria-describedby={
-                  generationAvailable ? undefined : "move-plan-migration-required"
-                }
-              >
-                {hasPlan
-                  ? "AIで整理プランを更新する"
-                  : "AIで整理プランを生成する"}
-              </button>
-              {!generationAvailable && (
-                <p
-                  id="move-plan-migration-required"
-                  className="move-plan-note"
-                  role="status"
-                >
-                  AI生成と保存はデータベース設定後に利用できます。
-                </p>
-              )}
-            </>
-          )}
-          {errorMessage && (
-            <p className="move-plan-error" role="alert">
-              {errorMessage}
-            </p>
-          )}
-        </section>
-      )}
+      </details>
 
       {hasPlan && (
         <section className="move-plan-timeline" aria-labelledby="timeline-title">
           <div className="move-plan-section-heading">
             <div>
-              <p className="move-plan-eyebrow">保存済み</p>
-              <h2 id="timeline-title">引っ越しまでの整理スケジュール</h2>
+              <h2 id="timeline-title">これからのスケジュール</h2>
             </div>
           </div>
           <p className="move-plan-summary">{plan.summary}</p>
@@ -297,17 +296,18 @@ export function MovePlanPageClient({
                       <li
                         key={`${task.itemId}-${task.taskTitle}-${index}`}
                         className="move-plan-task"
+                        data-action={task.action}
                       >
                         <div className="move-plan-task-heading">
                           <strong>{task.taskTitle}</strong>
-                          <span>{priorityLabel(task.priority)}</span>
+                          <span data-priority={task.priority}>{priorityLabel(task.priority)}</span>
                         </div>
                         <p>{task.taskDescription}</p>
-                        <ul>
+                        <ol>
                           {task.steps.map((step) => (
                             <li key={step}>{step}</li>
                           ))}
-                        </ul>
+                        </ol>
                         {task.requiresOfficialConfirmation && (
                           <p className="move-plan-official-note">
                             公式情報の確認が必要です。自治体などの最新情報をご確認ください。

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AccountHeader } from "../../../components/account/AccountHeader";
 import { MovePlanPageClient } from "../../../components/inventory/MovePlanPageClient";
@@ -10,6 +11,8 @@ import {
   buildMovePlanItems,
 } from "../../../server/move-plan";
 import { getSupabaseServerClient, requirePageUser } from "../../../lib/supabase/server";
+
+export const metadata: Metadata = { title: "引っ越し整理プラン" };
 
 export default async function MovePlanPage() {
   const user = await requirePageUser();

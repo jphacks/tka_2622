@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AccountHeader } from "../../components/account/AccountHeader";
 import { OnboardingForm } from "../../components/account/OnboardingForm";
@@ -5,6 +6,8 @@ import {
   getSupabaseServerClient,
   requirePageUser,
 } from "../../lib/supabase/server";
+
+export const metadata: Metadata = { title: "設定" };
 
 export default async function SettingsPage() {
   const user = await requirePageUser();
