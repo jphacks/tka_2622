@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type InventoryFilter = "all" | "pending" | "in_progress" | "completed";
@@ -15,6 +16,14 @@ interface InventoryItem {
 
 interface InventoryCollectionProps {
   items: InventoryItem[];
+  movePlan: {
+    movingDate: string | null;
+    totalItemCount: number;
+    selectedItemCount: number;
+    completedItemCount: number;
+    hasPlan: boolean;
+    needsUpdate: boolean;
+  };
 }
 
 const FILTERS: { id: InventoryFilter; label: string }[] = [
@@ -46,7 +55,10 @@ function getItemStatus(item: InventoryItem): {
   return { label: "未整理", kind: "pending" };
 }
 
-export function InventoryCollection({ items }: InventoryCollectionProps) {
+export function InventoryCollection({
+  items,
+  movePlan,
+}: InventoryCollectionProps) {
   const [activeFilter, setActiveFilter] = useState<InventoryFilter>("all");
   const counts = useMemo(
     () => ({
@@ -81,6 +93,70 @@ export function InventoryCollection({ items }: InventoryCollectionProps) {
             </button>
           ))}
         </div>
+        {activeFilter === "all" && (
+          <section
+            className="move-preparation-card"
+            aria-labelledby="move-preparation-title"
+          >
+            <div className="move-preparation-heading">
+              <div>
+                <h2 id="move-preparation-title">引っ越し準備</h2>
+                <p>整理方法が決まった持ち物</p>
+              </div>
+              <p className="move-preparation-count">
+                <strong>{movePlan.selectedItemCount}</strong>
+                <span> / {movePlan.totalItemCount} 件</span>
+              </p>
+            </div>
+            <div
+              className="move-preparation-progress"
+              role="progressbar"
+              aria-label="整理方法が決まった持ち物の割合"
+              aria-valuemin={0}
+              aria-valuemax={Math.max(1, movePlan.totalItemCount)}
+              aria-valuenow={movePlan.selectedItemCount}
+            >
+              <span
+                style={{
+                  width:
+                    movePlan.totalItemCount === 0
+                      ? "0%"
+                      : `${Math.min(
+                          100,
+                          (movePlan.selectedItemCount / movePlan.totalItemCount) *
+                            100,
+                        )}%`,
+                }}
+              />
+            </div>
+            <div className="move-preparation-details">
+              <p>
+                <span>実際に整理完了</span>
+                <strong>{movePlan.completedItemCount} 件</strong>
+              </p>
+              <p>
+                <span>引っ越し予定日</span>
+                {movePlan.movingDate ? (
+                  <strong>
+                    {`${Number(movePlan.movingDate.slice(5, 7))}月${Number(
+                      movePlan.movingDate.slice(8, 10),
+                    )}日`}
+                  </strong>
+                ) : (
+                  <Link href="/settings">未設定・設定する</Link>
+                )}
+              </p>
+            </div>
+            <Link className="move-preparation-link" href="/items/plan">
+              {movePlan.needsUpdate
+                ? "整理プランを確認する"
+                : movePlan.hasPlan
+                  ? "整理プランを見る"
+                  : "整理プランへ進む"}
+              <span aria-hidden="true">›</span>
+            </Link>
+          </section>
+        )}
         {items.length === 0 ? (
           <div className="inventory-empty inventory-collection-empty">
             <h2>まだ持ち物がありません</h2>

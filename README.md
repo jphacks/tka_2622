@@ -53,6 +53,20 @@
 `sell_station_businesses.csv` は確認用サブセットとして検証し、独立したテーブルにはしません。
 OSM 候補用テーブルは公式オープンデータの商店テーブルと分離し、匿名・認証済みクライアントからは読み出せません。
 
+## 引っ越し整理プランの設定
+
+1. `supabase/migrations/20261017230000_add_move_date_and_user_move_plans.sql` を
+   Supabase SQL Editor で手動実行します。この migration は任意の引っ越し日とユーザーごとの
+   整理プラン保存領域、本人だけが実行できる生成・保存 RPC を追加します。アプリから
+   リモート schema を自動変更することはありません。
+2. `.env.local` とデプロイ先の環境変数に `QWEN_TEXT_MODEL` を設定します。生成では
+   `DASHSCOPE_API_KEY`、`QWEN_BASE_URL`、`QWEN_TEXT_MODEL` を使用します。たとえば
+   `qwen3.7-plus` は Model Studio の文章生成および JSON object structured-output 対応モデルです。
+   アカウントのリージョンで利用可能か Model Studio で確認してください。画像認識用の
+   `QWEN_VISION_MODEL` はテキスト生成の代替には使いません。
+3. `/items/plan` を開いただけでは AI は呼び出されません。ユーザーが生成・更新ボタンを
+   押したときだけ保存済みの単品プランをまとめます。
+
 ## OSM 候補データのライセンスと表示
 
 Geofabrik Kantō PBF から抽出した候補と駅距離対応は、別々の

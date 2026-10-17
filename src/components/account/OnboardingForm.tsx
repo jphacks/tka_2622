@@ -10,12 +10,14 @@ type ResidenceType = "apartment" | "dormitory" | "sharehouse";
 interface OnboardingFormProps {
   initialResidenceType: string | null;
   initialStationId: string | null;
+  initialMovingDate?: string | null;
   isSettings?: boolean;
 }
 
 export function OnboardingForm({
   initialResidenceType,
   initialStationId,
+  initialMovingDate = null,
   isSettings = false,
 }: OnboardingFormProps) {
   const router = useRouter();
@@ -27,6 +29,7 @@ export function OnboardingForm({
       : "",
   );
   const [stationId, setStationId] = useState<string | null>(initialStationId);
+  const [movingDate, setMovingDate] = useState(initialMovingDate ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stations = useStations(stationId, setStationId);
@@ -42,6 +45,7 @@ export function OnboardingForm({
         body: JSON.stringify({
           residenceType,
           nearestStationId: stationId,
+          movingDate: movingDate || null,
         }),
       });
       const payload: unknown = await response.json();
@@ -109,6 +113,17 @@ export function OnboardingForm({
             onRetry={() => void stations.loadStations()}
           />
         </div>
+        <label className="account-field">
+          <span>引っ越し予定日 <small>任意</small></span>
+          <input
+            type="date"
+            value={movingDate}
+            onChange={(event) => setMovingDate(event.currentTarget.value)}
+          />
+          <span className="account-field-help">
+            未定の場合は空欄のまま進めます。後から設定で変更できます。
+          </span>
+        </label>
         {error && (
           <p className="account-error" role="alert">
             {error}

@@ -4,10 +4,16 @@ import { requireApiUser } from "../../../lib/supabase/server";
 const ProfileInputSchema = z.object({
   residenceType: z.enum(["apartment", "dormitory", "sharehouse"]),
   nearestStationId: z.string().trim().min(1).max(100),
+  movingDate: z.iso.date().nullable().optional(),
 });
 
 function profileSchemaUnavailable(error: { code?: string }): boolean {
-  return error.code === "PGRST205" || error.code === "42P01";
+  return (
+    error.code === "PGRST205" ||
+    error.code === "PGRST204" ||
+    error.code === "42P01" ||
+    error.code === "42703"
+  );
 }
 
 export async function GET(): Promise<Response> {
@@ -16,7 +22,9 @@ export async function GET(): Promise<Response> {
 
   const { data, error } = await auth.supabase
     .from("user_profiles")
-    .select("residence_type, nearest_station_id, onboarding_completed")
+    .select(
+      "residence_type, nearest_station_id, moving_date, onboarding_completed",
+    )
     .eq("user_id", auth.user.id)
     .maybeSingle();
   if (error) {
@@ -106,12 +114,17 @@ export async function PUT(request: Request): Promise<Response> {
         user_id: auth.user.id,
         residence_type: parsed.data.residenceType,
         nearest_station_id: parsed.data.nearestStationId,
+        ...(parsed.data.movingDate !== undefined
+          ? { moving_date: parsed.data.movingDate }
+          : {}),
         onboarding_completed: true,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" },
     )
-    .select("residence_type, nearest_station_id, onboarding_completed")
+    .select(
+      "residence_type, nearest_station_id, moving_date, onboarding_completed",
+    )
     .single();
   if (error) {
     console.error("Could not save the user profile.", error);

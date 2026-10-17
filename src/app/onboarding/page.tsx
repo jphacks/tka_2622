@@ -8,7 +8,9 @@ export default async function OnboardingPage() {
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from("user_profiles")
-    .select("residence_type, nearest_station_id, onboarding_completed")
+    .select(
+      "residence_type, nearest_station_id, moving_date, onboarding_completed",
+    )
     .eq("user_id", user.id)
     .maybeSingle();
   if (error) {
@@ -27,6 +29,7 @@ export default async function OnboardingPage() {
       <OnboardingForm
         initialResidenceType={data?.residence_type ?? null}
         initialStationId={data?.nearest_station_id ?? null}
+        initialMovingDate={data?.moving_date ?? null}
       />
     </main>
   );

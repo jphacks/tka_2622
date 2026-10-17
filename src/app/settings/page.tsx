@@ -11,7 +11,9 @@ export default async function SettingsPage() {
   const supabase = await getSupabaseServerClient();
   const { data: profile, error } = await supabase
     .from("user_profiles")
-    .select("residence_type, nearest_station_id, onboarding_completed")
+    .select(
+      "residence_type, nearest_station_id, moving_date, onboarding_completed",
+    )
     .eq("user_id", user.id)
     .maybeSingle();
   if (error) throw new Error("プロフィールを読み込めませんでした。");
@@ -23,6 +25,7 @@ export default async function SettingsPage() {
       <OnboardingForm
         initialResidenceType={profile.residence_type}
         initialStationId={profile.nearest_station_id}
+        initialMovingDate={profile.moving_date}
         isSettings
       />
     </main>

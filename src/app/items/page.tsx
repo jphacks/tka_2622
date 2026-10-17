@@ -5,6 +5,10 @@ import {
   getSupabaseServerClient,
   requirePageUser,
 } from "../../lib/supabase/server";
+import {
+  isMovePlanMigrationError,
+  loadMovePlanSource,
+} from "../../server/move-plan-data";
 import { AnalyzeResponseSchema } from "../../types/recognition";
 
 export default async function ItemsPage() {
@@ -58,10 +62,36 @@ export default async function ItemsPage() {
     }),
   );
 
+  const movePlanSource = await loadMovePlanSource(supabase, user.id);
+  const { data: savedMovePlan, error: savedMovePlanError } = await supabase
+    .from("user_move_plans")
+    .select("input_hash")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (savedMovePlanError && !isMovePlanMigrationError(savedMovePlanError)) {
+    console.error("Could not check the saved move plan status.", {
+      code: savedMovePlanError.code ?? "UNKNOWN",
+    });
+    throw new Error("引っ越しプランの状態を読み込めませんでした。");
+  }
+  const hasSavedMovePlan = Boolean(savedMovePlan?.input_hash);
+  const movePlanNeedsUpdate =
+    hasSavedMovePlan && savedMovePlan?.input_hash !== movePlanSource.inputHash;
+
   return (
     <main className="inventory-stage inventory-list-stage">
       <AccountHeader />
-      <InventoryCollection items={inventoryItems} />
+      <InventoryCollection
+        items={inventoryItems}
+        movePlan={{
+          movingDate: movePlanSource.movingDate,
+          totalItemCount: movePlanSource.totalItems,
+          selectedItemCount: movePlanSource.items.length,
+          completedItemCount: movePlanSource.completedItems,
+          hasPlan: hasSavedMovePlan,
+          needsUpdate: movePlanNeedsUpdate,
+        }}
+      />
     </main>
   );
 }
