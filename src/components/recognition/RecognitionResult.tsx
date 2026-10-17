@@ -28,6 +28,8 @@ const GRADES = [
 interface RecognitionResultProps {
   item: RecognizedItem;
   photo?: File | null;
+  photoUrl?: string | null;
+  readOnly?: boolean;
   isEdited: boolean;
   isManualEntry: boolean;
   onEditPhoto?: () => void;
@@ -57,6 +59,8 @@ function EditIcon() {
 export function RecognitionResult({
   item,
   photo = null,
+  photoUrl = null,
+  readOnly = false,
   isEdited,
   isManualEntry,
   onEditPhoto,
@@ -71,15 +75,13 @@ export function RecognitionResult({
       : GRADES.find(({ value }) => value === item.condition.grade)?.label;
 
   useEffect(() => {
-    if (!photo) {
-      setPreviewUrl(null);
-      return;
+    if (photo) {
+      const url = URL.createObjectURL(photo);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
     }
-
-    const url = URL.createObjectURL(photo);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photo]);
+    setPreviewUrl(photoUrl);
+  }, [photo, photoUrl]);
 
   return (
     <section className="recognition-confirmation" aria-labelledby="result-title">
@@ -94,12 +96,13 @@ export function RecognitionResult({
       </div>
 
       <div className="confirm-photo-row">
-        {previewUrl ? (
+        {previewUrl && (
           <div className="confirm-photo-preview">
             <img src={previewUrl} alt="認識に使用した写真" />
             {onEditPhoto && (
               <button
                 type="button"
+                className="confirm-photo-remove"
                 onClick={onEditPhoto}
                 aria-label="写真を変更する"
               >
@@ -107,18 +110,18 @@ export function RecognitionResult({
               </button>
             )}
           </div>
-        ) : (
-          <div className="confirm-photo-placeholder">写真なし</div>
         )}
         {onEditPhoto && (
           <button
             type="button"
-            className="confirm-photo-change"
+            className="confirm-photo-add"
             onClick={onEditPhoto}
           >
-            <span aria-hidden="true">＋</span>
-            <strong>写真を変更</strong>
-            <small>前の画面で選択</small>
+            <span className="confirm-photo-add-icon" aria-hidden="true">
+              ＋
+            </span>
+            <strong>写真を追加</strong>
+            <small>最大5枚まで</small>
           </button>
         )}
       </div>
@@ -135,6 +138,7 @@ export function RecognitionResult({
           <span className="confirm-input-wrap">
             <input
               value={item.name}
+              readOnly={readOnly}
               onChange={(event) => onNameChange(event.target.value)}
               maxLength={100}
               placeholder="例：木製デスク"
@@ -147,6 +151,7 @@ export function RecognitionResult({
             <span>カテゴリ</span>
             <select
               value={item.category}
+              disabled={readOnly}
               onChange={(event) =>
                 onCategoryChange(event.target.value as ItemCategory)
               }
@@ -162,6 +167,7 @@ export function RecognitionResult({
             <span>外観の状態</span>
             <select
               value={item.condition.grade ?? ""}
+              disabled={readOnly}
               onChange={(event) =>
                 onGradeChange(
                   event.target.value === ""
@@ -188,6 +194,21 @@ export function RecognitionResult({
           className="confirm-condition-ring"
           aria-label={`外観評価：${conditionLabel}`}
         >
+          <svg viewBox="0 0 84 84" aria-hidden="true">
+            <circle className="confirm-ring-track" cx="42" cy="42" r="36" />
+            <circle
+              className="confirm-ring-value"
+              cx="42"
+              cy="42"
+              r="36"
+              strokeDasharray="226.2"
+              strokeDashoffset={
+                item.condition.grade === null
+                  ? 226.2
+                  : 226.2 * (1 - item.condition.grade / 5)
+              }
+            />
+          </svg>
           <span>{item.condition.grade ?? "?"}</span>
           <small>/5</small>
         </div>

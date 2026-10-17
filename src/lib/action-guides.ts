@@ -17,7 +17,7 @@ export const ACTION_GUIDES: Record<Action, ActionGuideContent> = {
       "外せる部品や付属品をまとめておく",
       "傷や汚れを写真に記録しておく",
     ],
-    directoryMessage: "今後、近くの引っ越し・一時保管サービスを案内する予定です。",
+    directoryMessage: "搬出経路と新居の設置場所を確認してから、持っていく準備を進めましょう。",
   },
   sell: {
     title: "売却前に確認しましょう",
@@ -28,7 +28,7 @@ export const ACTION_GUIDES: Record<Action, ActionGuideContent> = {
       "近くの買取店を探す",
       "店舗に買取条件と受付方法を確認する",
     ],
-    directoryMessage: "以下は動作確認用の架空デモ店舗です。実在店舗ではありません。",
+    directoryMessage: "買取対象や受付条件は店舗によって異なるため、利用前に確認してください。",
   },
   give: {
     title: "譲る前に準備しましょう",
@@ -39,7 +39,7 @@ export const ACTION_GUIDES: Record<Action, ActionGuideContent> = {
       "写真と一緒に状態を具体的に伝える",
       "受け渡し方法と運搬の担当を相談する",
     ],
-    directoryMessage: "今後、学内譲渡や寄付の窓口を案内する予定です。",
+    directoryMessage: "身近な募集や地域の窓口を探し、品目ごとの受入れ条件を確認してください。",
   },
   dispose: {
     title: "処分前に自治体の案内を確認しましょう",

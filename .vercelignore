@@ -1,0 +1,9 @@
+.env*
+.git
+.next
+.zcode
+node_modules
+tokyo-reuse-data
+supabase
+scripts
+*.tsbuildinfo

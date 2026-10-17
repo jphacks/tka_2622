@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { ActionSchema, Pipeline2InputSchema } from "./recognition";
+import {
+  ActionSchema,
+  ItemCategorySchema,
+  Pipeline2InputSchema,
+} from "./recognition";
 
 export const ServiceMatchRequestSchema = Pipeline2InputSchema.extend({
   stationId: z.string().min(1),
@@ -13,8 +17,21 @@ export const ServiceBusinessSchema = z.object({
   distanceMeters: z.number().int().nonnegative(),
   description: z.string().min(1),
   supportedActions: z.array(ActionSchema),
+  supportedCategories: z.array(ItemCategorySchema).optional(),
+  purchaseStatus: z.enum(["confirmed", "unconfirmed"]).optional(),
   isMock: z.boolean(),
   externalUrl: z.string().url().optional(),
+});
+
+export const OsmStoreCandidateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  category: z.string().nullable(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  distanceMeters: z.number().int().nonnegative(),
+  sourceUrl: z.string().url(),
+  license: z.string().min(1),
 });
 
 export const ServiceMatchResponseSchema = z.object({
@@ -26,4 +43,5 @@ export const ServiceMatchResponseSchema = z.object({
 
 export type ServiceMatchRequest = z.infer<typeof ServiceMatchRequestSchema>;
 export type ServiceBusiness = z.infer<typeof ServiceBusinessSchema>;
+export type OsmStoreCandidate = z.infer<typeof OsmStoreCandidateSchema>;
 export type ServiceMatchResponse = z.infer<typeof ServiceMatchResponseSchema>;

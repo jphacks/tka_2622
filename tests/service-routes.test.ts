@@ -21,36 +21,73 @@ const validInput = {
 };
 
 describe("Pipeline 2 route handlers", () => {
-  it("lists mock stations with namespaced IDs", async () => {
-    const response = await stationsGet();
-    const payload = await response.json();
+  it("reports the unavailable station directory when Supabase is not configured", async () => {
+    const originalUrl = process.env.SUPABASE_URL;
+    const originalKey = process.env.SUPABASE_ANON_KEY;
+    const originalPublicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const originalPublishableKey =
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_ANON_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-    expect(response.status).toBe(200);
-    expect(payload.stations.map((station: { id: string }) => station.id)).toEqual(
-      expect.arrayContaining([
-        "mock-shinjuku",
-        "mock-shibuya",
-        "mock-takadanobaba",
-        "mock-ikebukuro",
-        "mock-akihabara",
-      ]),
-    );
+    try {
+      const response = await stationsGet();
+      const payload = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(payload.error.code).toBe("STATION_DIRECTORY_UNAVAILABLE");
+      expect(payload.error.message).toContain("Supabase が設定されていません");
+    } finally {
+      if (originalUrl === undefined) delete process.env.SUPABASE_URL;
+      else process.env.SUPABASE_URL = originalUrl;
+      if (originalKey === undefined) delete process.env.SUPABASE_ANON_KEY;
+      else process.env.SUPABASE_ANON_KEY = originalKey;
+      if (originalPublicUrl === undefined) {
+        delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      } else {
+        process.env.NEXT_PUBLIC_SUPABASE_URL = originalPublicUrl;
+      }
+      if (originalPublishableKey === undefined) {
+        delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+      } else {
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY =
+          originalPublishableKey;
+      }
+    }
   });
 
-  it("returns sorted sale results for the selected station", async () => {
-    const response = await matchPost(
-      matchRequest({ ...validInput, stationId: "mock-takadanobaba" }),
-    );
-    const payload = await response.json();
+  it("does not return mock sale businesses when Supabase is unavailable", async () => {
+    const originalUrl = process.env.SUPABASE_URL;
+    const originalKey = process.env.SUPABASE_ANON_KEY;
+    const originalPublicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const originalPublishableKey =
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_ANON_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-    expect(response.status).toBe(200);
-    expect(payload.dataSource).toBe("mock");
-    expect(payload.results.map((business: { distanceMeters: number }) =>
-      business.distanceMeters,
-    )).toEqual([280, 640, 910]);
-    expect(payload.results.every((business: { isMock: boolean }) =>
-      business.isMock,
-    )).toBe(true);
+    try {
+      const response = await matchPost(
+        matchRequest({ ...validInput, stationId: "station-a" }),
+      );
+      const payload = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(payload.error.code).toBe("SERVICE_DIRECTORY_UNAVAILABLE");
+    } finally {
+      if (originalUrl !== undefined) process.env.SUPABASE_URL = originalUrl;
+      if (originalKey !== undefined) process.env.SUPABASE_ANON_KEY = originalKey;
+      if (originalPublicUrl !== undefined) {
+        process.env.NEXT_PUBLIC_SUPABASE_URL = originalPublicUrl;
+      }
+      if (originalPublishableKey !== undefined) {
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY =
+          originalPublishableKey;
+      }
+    }
   });
 
   it.each(["keep", "give", "dispose"] as const)(
@@ -70,23 +107,9 @@ describe("Pipeline 2 route handlers", () => {
     },
   );
 
-  it("returns an empty state response for a known station without mock data", async () => {
-    const response = await matchPost(
-      matchRequest({ ...validInput, stationId: "mock-shibuya" }),
-    );
-    const payload = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(payload.results).toEqual([]);
-  });
-
-  it("rejects invalid input and unknown station IDs", async () => {
+  it("rejects invalid input", async () => {
     const invalid = await matchPost(matchRequest({ stationId: "mock-shinjuku" }));
-    const unknownStation = await matchPost(
-      matchRequest({ ...validInput, stationId: "unknown-station" }),
-    );
 
     expect(invalid.status).toBe(400);
-    expect(unknownStation.status).toBe(404);
   });
 });

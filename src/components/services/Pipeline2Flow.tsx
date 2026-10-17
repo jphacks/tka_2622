@@ -1,30 +1,41 @@
 "use client";
 
 import type { Pipeline2Input } from "../../types/recognition";
-import { ActionGuide } from "./ActionGuide";
-import { ServiceResults } from "./ServiceResults";
+import type { Action } from "../../types/recognition";
+import type { RuleResult } from "../../server/rules/schemas";
+import { RuleResultView } from "./RuleResultView";
 import { StationSelector } from "../stations/StationSelector";
-import { useServiceMatching } from "../../hooks/useServiceMatching";
+import { useStations } from "../../hooks/useStations";
 
-const ACTION_LABELS = {
+const ACTION_LABELS: Record<Action, string> = {
   keep: "保管する",
   sell: "売る",
   give: "譲る",
   dispose: "処分する",
-} as const;
+};
 
 interface Pipeline2FlowProps {
   input: Pipeline2Input;
-  onBack: () => void;
+  selectedStationId: string | null;
+  ruleResult: RuleResult | null;
+  ruleLoading: boolean;
+  ruleError: string | null;
+  onStationChange: (stationId: string) => void;
+  onRetryRules: () => void;
   onEditAction: () => void;
 }
 
 export function Pipeline2Flow({
   input,
-  onBack,
+  selectedStationId,
+  ruleResult,
+  ruleLoading,
+  ruleError,
+  onStationChange,
+  onRetryRules,
   onEditAction,
 }: Pipeline2FlowProps) {
-  const matching = useServiceMatching(input);
+  const stations = useStations(selectedStationId, onStationChange);
 
   return (
     <main className="app-shell pipeline2-shell">
@@ -42,11 +53,8 @@ export function Pipeline2Flow({
       </section>
       <div className="pipeline2-content">
         <div className="pipeline2-nav">
-          <button className="text-button" type="button" onClick={onBack}>
-            ← 確認画面に戻る
-          </button>
           <button className="text-button" type="button" onClick={onEditAction}>
-            Actionを変更する
+            ← 方法を選び直す
           </button>
         </div>
         <section className="pipeline2-item-card" aria-label="確認済みの持ち物">
@@ -54,38 +62,39 @@ export function Pipeline2Flow({
           <strong>{input.item.name}</strong>
           <span>あなたの選択：{ACTION_LABELS[input.selectedAction]}</span>
         </section>
-        <section className="station-card" aria-labelledby="station-title">
-          <div className="section-heading">
-            <span className="step-number">01</span>
-            <div>
-              <h2 id="station-title">最寄り駅を選ぶ</h2>
-              <p>駅名で検索して、1つ選択してください。駅一覧はデモ用です。</p>
-            </div>
-          </div>
-          <StationSelector
-            stations={matching.stations}
-            selectedStationId={matching.selectedStationId}
-            loading={matching.stationsLoading}
-            error={matching.stationsError}
-            onSelect={matching.selectStation}
-            onRetry={() => void matching.loadStations()}
-          />
-          <button
-            className="button button-primary match-button"
-            type="button"
-            onClick={() => void matching.search()}
-            disabled={!matching.selectedStationId || matching.loading}
+        {input.selectedAction === "sell" && (
+          <section
+            className="station-card"
+            id="station-selector"
+            aria-labelledby="station-title"
           >
-            近くのサービスを探す
-            <span aria-hidden="true">→</span>
-          </button>
-        </section>
-        <ActionGuide action={input.selectedAction} item={input.item} />
-        <ServiceResults
-          result={matching.result}
-          loading={matching.loading}
-          error={matching.error}
-          onRetry={() => void matching.search()}
+            <div className="section-heading">
+              <span className="step-number">01</span>
+              <div>
+                <h2 id="station-title">最寄り駅を選ぶ</h2>
+                <p>駅名で検索して、1つ選択してください。</p>
+              </div>
+            </div>
+            <StationSelector
+              stations={stations.stations}
+              selectedStationId={stations.selectedStationId}
+              loading={stations.loading}
+              error={stations.error}
+              onSelect={stations.selectStation}
+              onRetry={() => void stations.loadStations()}
+            />
+            <p className="station-rule-hint">
+              {selectedStationId
+                ? "選択した駅に合わせて案内を更新します。"
+                : "駅を選ぶと、近くの確認済み買取店とOSM候補を確認できます。"}
+            </p>
+          </section>
+        )}
+        <RuleResultView
+          result={ruleResult}
+          loading={ruleLoading}
+          error={ruleError}
+          onRetry={onRetryRules}
         />
       </div>
       <footer className="footer">

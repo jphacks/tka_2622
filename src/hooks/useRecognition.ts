@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MOCK_ANALYSIS } from "../fixtures/mock-analysis";
 import { analyzeImage } from "../lib/api-client";
 import {
   buildPipeline2Input,
@@ -9,7 +8,6 @@ import {
 } from "../lib/recognition-workflow";
 import { validateImageFile } from "../lib/image-validation";
 import {
-  AnalyzeResponseSchema,
   type Action,
   type AnalyzeResponse,
   type ItemCategory,
@@ -17,15 +15,12 @@ import {
   type RecognizedItem,
 } from "../types/recognition";
 
-export type AnalysisMode = "mock" | "real";
 export type WorkflowStatus =
   | "idle"
   | "preview"
   | "analyzing"
   | "result"
   | "confirmed";
-
-const MOCK_DELAY_MS = 450;
 
 const MANUAL_ENTRY: AnalyzeResponse = {
   item: {
@@ -44,7 +39,6 @@ const MANUAL_ENTRY: AnalyzeResponse = {
 };
 
 export function useRecognition() {
-  const [mode, setMode] = useState<AnalysisMode>("mock");
   const [status, setStatus] = useState<WorkflowStatus>("idle");
   const [file, setFile] = useState<File | null>(null);
   const [response, setResponse] = useState<AnalyzeResponse | null>(null);
@@ -63,19 +57,6 @@ export function useRecognition() {
       isItemEdited(originalItem, item),
     [item, originalItem],
   );
-
-  function changeMode(nextMode: AnalysisMode) {
-    if (nextMode === mode) return;
-    setMode(nextMode);
-    setResponse(null);
-    setOriginalItem(null);
-    setItem(null);
-    setSelectedAction(null);
-    setPipeline2Input(null);
-    setError(null);
-    setIsManualEntry(false);
-    setStatus(file ? "preview" : "idle");
-  }
 
   function selectFile(nextFile: File | null) {
     setError(null);
@@ -114,16 +95,11 @@ export function useRecognition() {
     setIsManualEntry(false);
 
     try {
-      let result: AnalyzeResponse;
-      if (mode === "mock") {
-        await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
-        result = AnalyzeResponseSchema.parse(MOCK_ANALYSIS);
-      } else {
-        result = await analyzeImage(file);
-      }
+      const result = await analyzeImage(file);
       setResponse(result);
       setOriginalItem(result.item);
       setItem(result.item);
+      setSelectedAction(result.recommendation.action);
       setStatus("result");
       return true;
     } catch (analysisError) {
@@ -175,6 +151,10 @@ export function useRecognition() {
 
   function chooseAction(action: Action) {
     setSelectedAction(action);
+    if (status === "confirmed" && item) {
+      setPipeline2Input(buildPipeline2Input(item, action));
+      return;
+    }
     setPipeline2Input(null);
     setStatus("result");
   }
@@ -203,8 +183,6 @@ export function useRecognition() {
   }
 
   return {
-    mode,
-    setMode: changeMode,
     status,
     file,
     response,

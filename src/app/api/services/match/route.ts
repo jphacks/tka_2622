@@ -1,4 +1,4 @@
-import { matchServices } from "../../../../server/matching/match-services";
+import { SupabaseRuleServiceProvider } from "../../../../server/rules/providers/supabase-provider";
 import { ServiceMatchRequestSchema } from "../../../../types/service";
 
 export async function POST(request: Request): Promise<Response> {
@@ -20,18 +20,45 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const results = await matchServices(parsed.data);
-  if (results === null) {
-    return Response.json(
-      { error: { code: "STATION_NOT_FOUND", message: "駅が見つかりませんでした。" } },
-      { status: 404 },
-    );
+  if (parsed.data.selectedAction !== "sell") {
+    return Response.json({
+      stationId: parsed.data.stationId,
+      selectedAction: parsed.data.selectedAction,
+      dataSource: "supabase",
+      results: [],
+    });
   }
 
-  return Response.json({
-    stationId: parsed.data.stationId,
-    selectedAction: parsed.data.selectedAction,
-    dataSource: "mock",
-    results,
-  });
+  try {
+    const businesses = await new SupabaseRuleServiceProvider()
+      .getBusinessesByStation(parsed.data.stationId);
+    const results = businesses
+      .filter((business) => business.purchaseStatus === "confirmed")
+      .filter((business) => business.distanceMeters <= 3000)
+      .filter((business) =>
+        business.supportedCategories?.includes(parsed.data.item.category),
+      )
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)
+      .slice(0, 10);
+
+    return Response.json({
+      stationId: parsed.data.stationId,
+      selectedAction: parsed.data.selectedAction,
+      dataSource: "supabase",
+      results,
+    });
+  } catch (error) {
+    return Response.json(
+      {
+        error: {
+          code: "SERVICE_DIRECTORY_UNAVAILABLE",
+          message:
+            error instanceof Error
+              ? error.message
+              : "買取サービス情報を取得できませんでした。",
+        },
+      },
+      { status: 503 },
+    );
+  }
 }
