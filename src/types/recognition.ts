@@ -1,0 +1,63 @@
+import { z } from "zod";
+
+export const ACTIONS = ["keep", "sell", "give", "dispose"] as const;
+export const ITEM_CATEGORIES = [
+  "furniture",
+  "electronics",
+  "books",
+  "clothing",
+  "bicycle",
+  "household",
+  "other",
+] as const;
+
+export const ActionSchema = z.enum(ACTIONS);
+export const ItemCategorySchema = z.enum(ITEM_CATEGORIES);
+export const ConditionGradeSchema = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+  z.literal(5),
+  z.null(),
+]);
+
+export const RecognizedItemSchema = z.object({
+  name: z.string().min(1),
+  category: ItemCategorySchema,
+  condition: z.object({
+    grade: ConditionGradeSchema,
+    observations: z.array(z.string()),
+    needsUserConfirmation: z.boolean(),
+  }),
+});
+
+export const AnalyzeResponseSchema = z.object({
+  item: RecognizedItemSchema,
+  recommendation: z.object({
+    action: ActionSchema.nullable(),
+    reason: z.string(),
+  }),
+});
+
+export const Pipeline2InputSchema = z.object({
+  item: z.object({
+    name: z.string().min(1),
+    category: ItemCategorySchema,
+    conditionGrade: ConditionGradeSchema,
+    observations: z.array(z.string()),
+  }),
+  selectedAction: ActionSchema,
+  location: z
+    .object({
+      municipalityCode: z.string().optional(),
+    })
+    .optional(),
+});
+
+export type Action = z.infer<typeof ActionSchema>;
+export type ItemCategory = z.infer<typeof ItemCategorySchema>;
+export type ConditionGrade = z.infer<typeof ConditionGradeSchema>;
+export type RecognizedItem = z.infer<typeof RecognizedItemSchema>;
+export type AnalyzeResponse = z.infer<typeof AnalyzeResponseSchema>;
+export type Pipeline2Input = z.infer<typeof Pipeline2InputSchema>;
