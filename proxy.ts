@@ -4,6 +4,7 @@ import {
   isServerPerformanceLoggingEnabled,
   measureServerOperation,
 } from "./src/lib/server-performance";
+import { isInvalidRefreshTokenError } from "./src/lib/supabase/auth-errors";
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -41,10 +42,24 @@ export async function proxy(request: NextRequest) {
       : new NextResponse("認証サービスを利用できません。", { status: 503 });
   }
 
-  if (
-    session.error &&
-    session.error.name !== "AuthSessionMissingError"
-  ) {
+  if (isInvalidRefreshTokenError(session.error)) {
+    if (isProtectedApi) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "UNAUTHENTICATED",
+            message: "ログイン期限が切れました。もう一度ログインしてください。",
+          },
+        },
+        { status: 401 },
+      );
+    }
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (session.error && session.error.name !== "AuthSessionMissingError") {
     console.error("Supabase proxy could not verify the session.", session.error);
     return isProtectedApi
       ? NextResponse.json(

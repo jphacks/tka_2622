@@ -11,7 +11,7 @@ interface InventoryItem {
   analysisStatus: string;
   status: string;
   selectedAction: string | null;
-  imageUrl: string;
+  imageUrl: string | null;
 }
 
 interface InventoryCollectionProps {
@@ -178,12 +178,14 @@ export function InventoryCollection({
                     aria-label={`${item.name ?? "分析待ちの持ち物"}、${status.label}。詳細を開く`}
                   >
                     <span className="inventory-card-photo">
-                      <img
-                        src={item.imageUrl}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                      />
+                      {item.imageUrl && (
+                        <img
+                          src={item.imageUrl}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      )}
                     </span>
                     <span className="inventory-card-copy">
                       <strong>{item.name ?? "分析待ちの持ち物"}</strong>

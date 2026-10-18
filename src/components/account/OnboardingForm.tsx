@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { StationSelector } from "../stations/StationSelector";
+import { Button } from "../ui";
 import { useStations } from "../../hooks/useStations";
 
 type ResidenceType = "apartment" | "dormitory" | "sharehouse";
@@ -129,15 +130,15 @@ export function OnboardingForm({
             {error}
           </p>
         )}
-        <button
+        <Button
           type="button"
-          className="account-primary"
+          variant="primary"
           disabled={!residenceType || !stationId || saving}
           onClick={() => void saveProfile()}
         >
           {saving ? "保存しています…" : isSettings ? "変更を保存" : "設定して持ち物へ"}
           {!saving && <span aria-hidden="true">→</span>}
-        </button>
+        </Button>
       </div>
     </section>
   );

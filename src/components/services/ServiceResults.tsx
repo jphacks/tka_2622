@@ -1,5 +1,6 @@
 import type { Action } from "../../types/recognition";
 import type { ServiceMatchResponse } from "../../types/service";
+import { EmptyState, LoadingState, RetryableError } from "../ui";
 import { ServiceCard } from "./ServiceCard";
 
 const ACTION_LABELS: Record<Action, string> = {
@@ -24,25 +25,16 @@ export function ServiceResults({
 }: ServiceResultsProps) {
   if (loading) {
     return (
-      <div className="loading-card" role="status" aria-live="polite">
-        <span className="spinner" />
-        <div>
-          <strong>近くのサービスを探しています</strong>
-          <p>駅周辺のデモデータを確認しています。</p>
-        </div>
-      </div>
+      <LoadingState
+        title="近くのサービスを探しています"
+        description="駅周辺のデモデータを確認しています。"
+      />
     );
   }
 
   if (error) {
     return (
-      <div className="notice notice-error" role="alert">
-        <span aria-hidden="true">!</span>
-        <p>{error}</p>
-        <button className="text-button" type="button" onClick={onRetry}>
-          もう一度探す
-        </button>
-      </div>
+      <RetryableError message={error} retryLabel="もう一度探す" onRetry={onRetry} />
     );
   }
 
@@ -64,14 +56,14 @@ export function ServiceResults({
         </div>
       </div>
       {result.results.length === 0 ? (
-        <div className="empty-state" role="status">
-          <strong>該当するサービスはまだありません</strong>
-          <p>
-            {result.selectedAction === "sell"
+        <EmptyState
+          title="該当するサービスはまだありません"
+          description={
+            result.selectedAction === "sell"
               ? "この駅のデモ店舗データはありません。別の駅を選択してください。"
-              : "この方法に対応するサービス一覧はまだ準備中です。"}
-          </p>
-        </div>
+              : "この方法に対応するサービス一覧はまだ準備中です。"
+          }
+        />
       ) : (
         <div className="service-list">
           {result.results.map((business, index) => (

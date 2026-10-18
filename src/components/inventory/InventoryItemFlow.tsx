@@ -16,7 +16,7 @@ import type { RuleResult } from "../../server/rules/schemas";
 
 interface InventoryItem {
   id: string;
-  imageUrl: string;
+  imageUrl: string | null;
   name: string | null;
   category: ItemCategory | null;
   conditionGrade: number | null;
@@ -324,7 +324,15 @@ export function InventoryItemFlow({
       </Link>
 
       <article className="inventory-item-summary">
-        <img src={item.imageUrl} alt={item.name ?? "登録した持ち物"} />
+        {item.imageUrl ? (
+          <img src={item.imageUrl} alt={item.name ?? "登録した持ち物"} />
+        ) : (
+          <div
+            className="inventory-item-image-placeholder"
+            role="img"
+            aria-label="写真を表示できません"
+          />
+        )}
         <div className="inventory-item-summary-copy">
           <div className="inventory-item-summary-title">
             <h1>

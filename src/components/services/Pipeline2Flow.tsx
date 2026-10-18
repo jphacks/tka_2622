@@ -6,6 +6,7 @@ import type { RuleResult } from "../../server/rules/schemas";
 import { RuleResultView } from "./RuleResultView";
 import { StationSelector } from "../stations/StationSelector";
 import { useStations } from "../../hooks/useStations";
+import { Button } from "../ui";
 
 const ACTION_LABELS: Record<Action, string> = {
   keep: "保管する",
@@ -53,9 +54,9 @@ export function Pipeline2Flow({
       </section>
       <div className="pipeline2-content">
         <div className="pipeline2-nav">
-          <button className="text-button" type="button" onClick={onEditAction}>
+          <Button variant="text" type="button" onClick={onEditAction}>
             ← 方法を選び直す
-          </button>
+          </Button>
         </div>
         <section className="pipeline2-item-card" aria-label="確認済みの持ち物">
           <span>確認済みの持ち物</span>

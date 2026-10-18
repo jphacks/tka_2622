@@ -11,7 +11,7 @@ Single source of truth for UI/UX work in this repository. **Read this file befor
 ## 1. Tech Stack Constraints
 
 - Next.js 16 App Router + React 19 + TypeScript. Read `node_modules/next/dist/docs/` before writing framework code (see AGENTS.md).
-- **No Tailwind, no CSS-in-JS, no component library.** All styling lives in `src/app/globals.css` using plain CSS with BEM-ish class prefixes (`home-*`, `confirm-*`, `rule-*`, `service-*`, `station-*`, `pipeline2-*`, `mode-*`).
+- **No Tailwind, CSS-in-JS, or external component library.** Reusable internal React/TypeScript primitives are allowed in `src/components/ui/`; all styling remains in `src/app/globals.css` using plain CSS with BEM-ish class prefixes (`home-*`, `confirm-*`, `rule-*`, `service-*`, `station-*`, `pipeline2-*`, `mode-*`).
 - Do **not** add UI dependencies (icon packs, component kits, font downloads) without explicit approval. Icons are inline SVGs with `stroke: currentColor`, `fill: none`, `stroke-linecap/linejoin: round`, width ~1.7–2.1.
 - Do not touch business logic, APIs, or data structures while doing UI work.
 
@@ -89,7 +89,15 @@ Size ramp (px) — do not invent values between steps:
 
 ## 6. Components
 
-Inventory (reuse before creating): `ImageUploader`, `RecognitionResult`, `ActionSelector`, `StationSelector`, `Pipeline2Flow`, `ServiceCard(s)`, `ActionGuide`, `RuleResultView`.
+Inventory (reuse before creating): `src/components/ui/` primitives (`Button`, loading/empty/error feedback, spinner), `ImageUploader`, `RecognitionResult`, `ActionSelector`, `StationSelector`, `Pipeline2Flow`, `ServiceCard(s)`, `ActionGuide`, `RuleResultView`.
+
+### Internal UI library rules
+
+- Before adding a control or feedback pattern, check `src/components/ui/` and the existing CSS classes in `src/app/globals.css`.
+- Prefer extending a shared primitive with a small, typed prop/variant over repeating JSX or styling. Keep page-specific copy and business decisions in the owning feature component.
+- UI primitives must preserve the existing class names, design tokens, keyboard behavior, focus rings, and accessible state semantics when adopted by existing screens.
+- Add a primitive only when it has multiple real consumers or a clear cross-screen contract. Do not wrap one-off markup or introduce a second visual system.
+- Keep the UI library presentational and dependency-free; feature components own data fetching, state, and APIs.
 
 - **Primary CTA** — `.home-analyze-button`: full-width, min-height 66–72 px, ink pill, label + `→` arrow, disabled = opacity .5. One primary CTA per screen.
 - **Secondary button** — `.button-secondary`: white, 1px `#dce4dc`, green-dark text. Text-link button: `.text-button`, underline, accent color.
@@ -136,7 +144,7 @@ Gradient everything · nested cards · eyebrow-chip-above-hero · 9–10 px text
    - Style/palette/typography research: `python .zcode/skills/ui-ux-pro-max/scripts/search.py "<query>" --domain style|typography|ux|icons`
    - Full system proposal: `python .zcode/skills/ui-ux-pro-max/scripts/search.py "<product description>" --design-system -p "<name>"`
    On Windows use `python` (not `python3`). It is offline/std-lib only.
-3. Implement with existing components and tokens (§2–§6). Preserve IA and flows.
+3. Check `src/components/ui/` and existing feature components first; extend/reuse before creating. Implement with existing components and tokens (§2–§6). Preserve IA and flows.
 4. Refine with **impeccable** (`.zcode/skills/impeccable/`, engine at `scripts/bin/windows-x64/impeccable.exe`):
    - `impeccable.exe detect http://localhost:3000` — deterministic anti-pattern/contrast/legibility scan (must show **no new findings** vs. the 11 known legacy ones)
    - `impeccable.exe detect <file.css>` — quick regex-level pass

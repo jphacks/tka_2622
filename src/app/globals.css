@@ -1564,6 +1564,14 @@ summary:focus-visible {
   max-height: 216px;
 }
 
+.inventory-item-image-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 216px;
+  border-radius: var(--radius-card);
+  background: #f1efeb;
+}
+
 .inventory-item-summary-copy {
   display: grid;
   min-width: 0;

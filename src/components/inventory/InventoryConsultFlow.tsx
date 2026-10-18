@@ -26,6 +26,7 @@ import {
   isItemUnidentified,
   isRecommendationCurrent,
 } from "../../lib/recognition-workflow";
+import { Button, LoadingState } from "../ui";
 
 type AnalysisStatus = "pending" | "processing" | "succeeded" | "failed";
 type ItemStatus = "pending" | "in_progress" | "completed";
@@ -556,20 +557,17 @@ export function InventoryConsultFlow({
           </p>
         )}
         {analysisLoading && (
-          <div className="loading-card" role="status" aria-live="polite">
-            <span className="spinner" />
-            <div>
-              <strong>写真を分析しています</strong>
-              <p>物品情報を確認しています。少しお待ちください。</p>
-            </div>
-          </div>
+          <LoadingState
+            title="写真を分析しています"
+            description="物品情報を確認しています。少しお待ちください。"
+          />
         )}
         {analysisError && (
           <div className="notice notice-error" role="alert">
             <p>{analysisError}</p>
             {analysisStatus === "failed" && (
-              <button
-                className="text-button"
+              <Button
+                variant="text"
                 type="button"
                 onClick={() => {
                   analysisAttempted.current = true;
@@ -577,7 +575,7 @@ export function InventoryConsultFlow({
                 }}
               >
                 AI分析を再試行
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -693,14 +691,14 @@ export function InventoryConsultFlow({
                 {correctionError}
               </p>
             )}
-            <button
-              className="button-secondary"
+            <Button
+              variant="secondary"
               type="button"
               disabled={savingCorrection || !draft.name.trim()}
               onClick={() => void saveCorrection()}
             >
               {savingCorrection ? "保存中…" : "訂正内容を保存"}
-            </button>
+            </Button>
           </section>
         )}
 

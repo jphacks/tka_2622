@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { measureServerOperation } from "../server-performance";
+import { isInvalidRefreshTokenError } from "./auth-errors";
 
 export async function getSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -60,6 +61,9 @@ export async function requirePageUser(options?: {
     throw new Error("認証サービスに接続できません。時間をおいて再度お試しください。");
   }
   const { data, error } = authResult;
+  if (isInvalidRefreshTokenError(error)) {
+    redirect("/login");
+  }
   if (
     error &&
     error.status !== 401 &&
@@ -113,6 +117,19 @@ export async function requireApiUser(): Promise<
     };
   }
   const { data, error } = authResult;
+  if (isInvalidRefreshTokenError(error)) {
+    return {
+      response: NextResponse.json(
+        {
+          error: {
+            code: "UNAUTHENTICATED",
+            message: "ログイン期限が切れました。もう一度ログインしてください。",
+          },
+        },
+        { status: 401 },
+      ),
+    };
+  }
   if (
     error &&
     error.status !== 401 &&

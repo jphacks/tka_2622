@@ -12,7 +12,10 @@ import {
   createMovePlanSource,
   isMovePlanMigrationError,
 } from "../../server/move-plan-data";
-import { mapSignedImageUrls } from "../../lib/supabase/signed-image-urls";
+import {
+  mapAvailableSignedImageUrls,
+  uniqueImagePaths,
+} from "../../lib/supabase/signed-image-urls";
 import {
   isServerPerformanceLoggingEnabled,
   logServerPerformance,
@@ -157,47 +160,41 @@ export default async function ItemsPage() {
 
   let signedImageByPath = new Map<string, string>();
   if (items.length > 0) {
+    const imagePaths = uniqueImagePaths(items.map((item) => item.image_path));
     const { data: signedImages, error: signedImagesError } =
       await measureServerOperation(
         "items.storage.signed_urls",
         () =>
           supabase.storage
             .from("item-images")
-            .createSignedUrls(
-              items.map((item) => item.image_path),
-              60 * 60,
-            ),
+            .createSignedUrls(imagePaths, 60 * 60),
         traceFields,
       );
     if (signedImagesError || !signedImages) {
-      console.error(
-        "Could not create private inventory image URLs.",
-        signedImagesError,
-      );
-      throw new Error("持ち物の写真を読み込めませんでした。");
-    }
-    const mappedImages = mapSignedImageUrls(
-      items.map((item) => item.image_path),
-      signedImages,
-    );
-    if (!mappedImages.success) {
-      console.error("Could not create private inventory image URLs.", {
-        reason: mappedImages.reason,
+      console.warn("Some inventory item photos could not be signed.", {
+        errorType: signedImagesError?.name ?? null,
       });
-      throw new Error("持ち物の写真を読み込めませんでした。");
+    } else {
+      const mappedImages = mapAvailableSignedImageUrls(imagePaths, signedImages);
+      if (!mappedImages) {
+        console.error("Could not map private inventory image URLs.", {
+          reason: "DUPLICATE_REQUESTED_PATHS",
+        });
+      } else {
+        if (mappedImages.unavailableCount > 0 || mappedImages.invalidResultCount > 0) {
+          console.warn("Some inventory item photos are unavailable.", {
+            unavailableCount: mappedImages.unavailableCount,
+            invalidResultCount: mappedImages.invalidResultCount,
+          });
+        }
+        signedImageByPath = mappedImages.urlsByPath;
+      }
     }
-    signedImageByPath = mappedImages.urlsByPath;
   }
 
   const viewModelStartedAt = performance.now();
   const inventoryItems = items.map((item) => {
     const image = signedImageByPath.get(item.image_path);
-    if (!image) {
-      console.error("Could not create a private inventory image URL.", {
-        reason: "SIGNED_URL_MISSING",
-      });
-      throw new Error("持ち物の写真を読み込めませんでした。");
-    }
     const recognition = item.recognition_result
       ? AnalyzeResponseSchema.safeParse(item.recognition_result)
       : null;
@@ -215,7 +212,7 @@ export default async function ItemsPage() {
       analysisStatus: item.analysis_status,
       status: item.status,
       selectedAction: item.selected_action,
-      imageUrl: image,
+      imageUrl: image ?? null,
     };
   });
   const hasSavedMovePlan = Boolean(savedMovePlan?.input_hash);

@@ -8,7 +8,10 @@ import {
 } from "../../../server/move-plan-data";
 import { MovePlanSchema } from "../../../server/move-plan";
 import { getSupabaseServerClient, requirePageUser } from "../../../lib/supabase/server";
-import { mapAvailableSignedImageUrls } from "../../../lib/supabase/signed-image-urls";
+import {
+  mapAvailableSignedImageUrls,
+  uniqueImagePaths,
+} from "../../../lib/supabase/signed-image-urls";
 
 export const metadata: Metadata = { title: "引っ越し整理プラン" };
 
@@ -66,35 +69,33 @@ export default async function MovePlanPage() {
   const validPlansById = new Map(source.items.map((item) => [item.id, item]));
   let signedImageByPath = new Map<string, string>();
   if (itemRows.length > 0) {
+    const imagePaths = uniqueImagePaths(itemRows.map((item) => item.image_path));
     const { data: signedImages, error: signedImagesError } = await supabase.storage
       .from("item-images")
       .createSignedUrls(
-        itemRows.map((item) => item.image_path),
+        imagePaths,
         60 * 60,
       );
     if (signedImagesError || !signedImages) {
-      console.error("Could not create move plan item photo URLs.", {
+      console.warn("Some move plan item photos could not be signed.", {
         errorType: signedImagesError?.name ?? null,
       });
-      throw new Error("持ち物の写真を読み込めませんでした。");
+    } else {
+      const mappedImages = mapAvailableSignedImageUrls(imagePaths, signedImages);
+      if (!mappedImages) {
+        console.error("Could not map move plan item photo URLs.", {
+          reason: "DUPLICATE_REQUESTED_PATHS",
+        });
+      } else {
+        if (mappedImages.unavailableCount > 0 || mappedImages.invalidResultCount > 0) {
+          console.warn("Some move plan item photos are unavailable.", {
+            unavailableCount: mappedImages.unavailableCount,
+            invalidResultCount: mappedImages.invalidResultCount,
+          });
+        }
+        signedImageByPath = mappedImages.urlsByPath;
+      }
     }
-    const mappedImages = mapAvailableSignedImageUrls(
-      itemRows.map((item) => item.image_path),
-      signedImages,
-    );
-    if (!mappedImages) {
-      console.error("Could not create move plan item photo URLs.", {
-        reason: "DUPLICATE_REQUESTED_PATHS",
-      });
-      throw new Error("持ち物の写真を読み込めませんでした。");
-    }
-    if (mappedImages.unavailableCount > 0 || mappedImages.invalidResultCount > 0) {
-      console.warn("Some move plan item photos are unavailable.", {
-        unavailableCount: mappedImages.unavailableCount,
-        invalidResultCount: mappedImages.invalidResultCount,
-      });
-    }
-    signedImageByPath = mappedImages.urlsByPath;
   }
   const cards = itemRows.map((item) => {
     const image = signedImageByPath.get(item.image_path);

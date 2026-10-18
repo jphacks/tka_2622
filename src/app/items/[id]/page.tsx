@@ -41,10 +41,12 @@ export default async function InventoryItemPage({
   const { data: signedImage, error: imageError } = await supabase.storage
     .from("item-images")
     .createSignedUrl(item.image_path, 60 * 60);
-  if (imageError || !signedImage) {
-    console.error("Could not create a private item image URL.", imageError);
-    throw new Error("写真を読み込めませんでした。");
+  if (imageError || !signedImage?.signedUrl) {
+    console.warn("The item photo is unavailable.", {
+      errorType: imageError?.name ?? null,
+    });
   }
+  const imageUrl = imageError ? null : signedImage?.signedUrl ?? null;
 
   const { data: handlingPlan, error: planError } = await supabase
     .from("handling_plans")
@@ -89,7 +91,7 @@ export default async function InventoryItemPage({
       <InventoryItemFlow
         initialItem={{
           id: item.id,
-          imageUrl: signedImage.signedUrl,
+          imageUrl,
           name: item.name ?? recognizedItem?.name ?? null,
           category: item.category ?? recognizedItem?.category ?? null,
           conditionGrade:

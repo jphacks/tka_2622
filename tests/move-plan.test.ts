@@ -17,6 +17,7 @@ import { generateMovePlanText } from "../src/server/recognition/qwen-text-client
 import {
   mapAvailableSignedImageUrls,
   mapSignedImageUrls,
+  uniqueImagePaths,
 } from "../src/lib/supabase/signed-image-urls";
 
 vi.mock("../src/lib/supabase/server", () => ({
@@ -209,6 +210,12 @@ describe("mapping private image signed URLs", () => {
     expect(
       mapAvailableSignedImageUrls(["same.jpg", "same.jpg"], []),
     ).toBeNull();
+  });
+
+  it("deduplicates paths before requesting signed URLs", () => {
+    expect(
+      uniqueImagePaths(["same.jpg", "other.jpg", "same.jpg"]),
+    ).toEqual(["same.jpg", "other.jpg"]);
   });
 });
 

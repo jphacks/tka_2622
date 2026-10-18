@@ -14,6 +14,10 @@ export interface AvailableSignedImageUrlMap {
   invalidResultCount: number;
 }
 
+export function uniqueImagePaths(paths: string[]): string[] {
+  return [...new Set(paths)];
+}
+
 export function mapSignedImageUrls(
   requestedPaths: string[],
   results: SignedImageUrlResult[],

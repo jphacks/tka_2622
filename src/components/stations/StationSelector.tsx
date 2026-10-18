@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Station } from "../../types/station";
+import { Button } from "../ui";
 
 interface StationSelectorProps {
   stations: Station[];
@@ -43,13 +44,13 @@ export function StationSelector({
           <strong>{selectedStation.name}</strong>
           <small>{selectedStation.lines.join("・")}</small>
         </div>
-        <button
-          className="text-button"
+        <Button
+          variant="text"
           type="button"
           onClick={() => setEditing(true)}
         >
           駅を変更
-        </button>
+        </Button>
       </div>
     );
   }
@@ -72,9 +73,9 @@ export function StationSelector({
       {error && (
         <div className="notice notice-error" role="alert">
           <p>{error}</p>
-          <button className="text-button" type="button" onClick={onRetry}>
+          <Button variant="text" type="button" onClick={onRetry}>
             再読み込み
-          </button>
+          </Button>
         </div>
       )}
       {!loading && !error && matches.length === 0 && (
@@ -106,13 +107,13 @@ export function StationSelector({
         </ul>
       )}
       {selectedStation && (
-        <button
-          className="text-button"
+        <Button
+          variant="text"
           type="button"
           onClick={() => setEditing(false)}
         >
           選択中の駅に戻る
-        </button>
+        </Button>
       )}
     </div>
   );

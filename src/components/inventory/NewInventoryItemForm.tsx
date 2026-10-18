@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ImageUploader } from "../recognition/ImageUploader";
+import { Button } from "../ui";
 
 export function NewInventoryItemForm() {
   const router = useRouter();
@@ -71,10 +72,10 @@ export function NewInventoryItemForm() {
         {error && (
           <p className="account-error" role="alert">{error}</p>
         )}
-        <button className="account-primary" type="submit" disabled={!file || saving}>
+        <Button type="submit" disabled={!file || saving}>
           {saving ? "安全に保存しています…" : "持ち物を登録する"}
           {!saving && <span aria-hidden="true">→</span>}
-        </button>
+        </Button>
       </form>
       <p className="inventory-privacy-note">
         対応形式：JPEG・PNG・WebP、5MBまで。登録後にAI識別を自動で開始します。
