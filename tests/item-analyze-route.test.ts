@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../src/app/api/items/[id]/analyze/route";
 import { requireApiUser } from "../src/lib/supabase/server";
+import { AI_STREAM_CONTENT_TYPE, readAiResponse } from "../src/lib/ai-stream";
 
 const mocks = vi.hoisted(() => ({
   analyzeItem: vi.fn(),
@@ -119,6 +120,33 @@ describe("POST /api/items/[id]/analyze", () => {
       analysis_status: "succeeded",
     });
     expect(mocks.analyzeItem).toHaveBeenCalledOnce();
+  });
+
+  it("streams the partial analysis when the client asks for a stream", async () => {
+    configureSupabase();
+    mocks.analyzeItem.mockImplementation(
+      async (_input: unknown, onPartial?: (partial: unknown) => void) => {
+        onPartial?.({ item: { name: "Sony" } });
+        return pspRecognition;
+      },
+    );
+
+    const response = await POST(
+      new Request("http://localhost", {
+        method: "POST",
+        headers: { Accept: AI_STREAM_CONTENT_TYPE },
+      }),
+      { params: Promise.resolve({ id: itemId }) },
+    );
+    const partials: unknown[] = [];
+    const result = await readAiResponse(response, (data) => partials.push(data));
+
+    expect(response.headers.get("content-type")).toContain(AI_STREAM_CONTENT_TYPE);
+    expect(partials).toEqual([{ item: { name: "Sony" } }]);
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      item: { name: "Sony PSP", analysis_status: "succeeded" },
+    });
   });
 
   it("returns a valid stored recognition result without calling Qwen again", async () => {

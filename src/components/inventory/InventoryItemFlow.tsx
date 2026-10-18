@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { displayItemCategory } from "../../lib/item-category";
 import { isItemUnidentified } from "../../lib/recognition-workflow";
+import { AI_STREAM_CONTENT_TYPE, readAiResponse } from "../../lib/ai-stream";
+import { RecognitionLivePreview } from "../ai/AiLivePreview";
 import {
   ITEM_CATEGORIES,
   AnalyzeResponseSchema,
@@ -120,6 +122,7 @@ export function InventoryItemFlow({
   const [recognition, setRecognition] = useState(initialRecognition);
   const [analysisStatus, setAnalysisStatus] = useState(initialItem.analysisStatus);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [liveRecognition, setLiveRecognition] = useState<unknown>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [showManualCorrection, setShowManualCorrection] = useState(false);
   const [manualName, setManualName] = useState(initialItem.name ?? "");
@@ -163,14 +166,20 @@ export function InventoryItemFlow({
     setAnalysisLoading(true);
     setAnalysisError(null);
     setAnalysisStatus("processing");
+    setLiveRecognition(null);
     try {
       const response = await fetch(`/api/items/${item.id}/analyze`, {
         method: "POST",
+        headers: { Accept: AI_STREAM_CONTENT_TYPE },
       });
-      const payload: unknown = await response.json();
-      if (!response.ok) {
+      const {
+        ok,
+        status,
+        body: payload,
+      } = await readAiResponse(response, setLiveRecognition);
+      if (!ok) {
         if (
-          response.status === 409 &&
+          status === 409 &&
           typeof payload === "object" &&
           payload !== null &&
           "error" in payload &&
@@ -220,6 +229,7 @@ export function InventoryItemFlow({
     } finally {
       analysisRequestInFlight.current = false;
       setAnalysisLoading(false);
+      setLiveRecognition(null);
     }
   }, [item.id, router]);
 
@@ -385,9 +395,11 @@ export function InventoryItemFlow({
               <dd>{formatCapturedAt(item.capturedAt)}</dd>
             </div>
           </dl>
-          {(analysisStatus !== "succeeded" ||
-            analysisLoading ||
-            recognitionUnidentified) && (
+          {analysisLoading && (
+            <RecognitionLivePreview partial={liveRecognition} />
+          )}
+          {!analysisLoading &&
+            (analysisStatus !== "succeeded" || recognitionUnidentified) && (
             <div
               className={`inventory-analysis-state${analysisStatus === "failed" ? " is-error" : ""}`}
               role={analysisStatus === "failed" ? "alert" : "status"}

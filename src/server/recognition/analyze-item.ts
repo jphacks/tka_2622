@@ -2,6 +2,7 @@ import {
   AnalyzeResponseSchema,
   type AnalyzeResponse,
 } from "../../types/recognition";
+import { parsePartialJson } from "../../lib/partial-json";
 import { RecognitionServiceError, requestQwenVision } from "./qwen-client";
 
 interface AnalyzeImageInput {
@@ -11,8 +12,17 @@ interface AnalyzeImageInput {
 
 export async function analyzeItem(
   input: AnalyzeImageInput,
+  onPartial?: (partial: unknown) => void,
 ): Promise<AnalyzeResponse> {
-  const content = await requestQwenVision(input);
+  const content = await requestQwenVision(
+    input,
+    onPartial
+      ? (text) => {
+          const partial = parsePartialJson(text);
+          if (partial !== undefined) onPartial(partial);
+        }
+      : undefined,
+  );
   let parsed: unknown;
 
   try {

@@ -14,6 +14,9 @@ export class QwenTextServiceError extends Error {
   }
 }
 
+import { parsePartialJson } from "../../lib/partial-json";
+import { readChatCompletionStream } from "./qwen-stream";
+
 const REQUEST_TIMEOUT_MS = 30_000;
 
 const SYSTEM_PROMPT = `あなたは引っ越し準備の行動順序を整理するアシスタントです。
@@ -46,6 +49,7 @@ function configuration() {
 
 export async function generateMovePlanText(
   sourceJson: string,
+  onPartial?: (partial: unknown) => void,
 ): Promise<unknown> {
   const { apiKey, baseUrl, model } = configuration();
   const controller = new AbortController();
@@ -70,6 +74,7 @@ export async function generateMovePlanText(
         response_format: { type: "json_object" },
         enable_thinking: false,
         temperature: 0.2,
+        ...(onPartial ? { stream: true } : {}),
       }),
       signal: controller.signal,
     });
@@ -82,6 +87,21 @@ export async function generateMovePlanText(
         "AI_UNAVAILABLE",
         "AI整理プランを作成できませんでした。時間をおいて再度お試しください。",
       );
+    }
+
+    if (onPartial) {
+      const text = await readChatCompletionStream(response, (current) => {
+        const partial = parsePartialJson(current);
+        if (partial !== undefined) onPartial(partial);
+      });
+      try {
+        return JSON.parse(text) as unknown;
+      } catch {
+        throw new QwenTextServiceError(
+          "AI_RESPONSE_INVALID",
+          "AI整理プランの形式を確認できませんでした。",
+        );
+      }
     }
 
     let payload: unknown;

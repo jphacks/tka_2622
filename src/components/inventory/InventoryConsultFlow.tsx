@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { RuleResultView } from "../services/RuleResultView";
 import { StationSelector } from "../stations/StationSelector";
 import { DisposalLocationSelector } from "../disposal/DisposalLocationSelector";
+import { RecognitionLivePreview } from "../ai/AiLivePreview";
+import { AI_STREAM_CONTENT_TYPE, readAiResponse } from "../../lib/ai-stream";
 import { useStations } from "../../hooks/useStations";
 import {
   displayItemCategory,
@@ -27,7 +29,7 @@ import {
   isItemUnidentified,
   isRecommendationCurrent,
 } from "../../lib/recognition-workflow";
-import { Button, LoadingState } from "../ui";
+import { Button } from "../ui";
 
 type AnalysisStatus = "pending" | "processing" | "succeeded" | "failed";
 type ItemStatus = "pending" | "in_progress" | "completed";
@@ -204,6 +206,7 @@ export function InventoryConsultFlow({
       area: initialResult?.disposal?.area ?? null,
     }),
   );
+  const [liveRecognition, setLiveRecognition] = useState<unknown>(null);
   const [evaluationLoading, setEvaluationLoading] = useState(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -250,12 +253,17 @@ export function InventoryConsultFlow({
     setAnalysisLoading(true);
     setAnalysisError(null);
     setAnalysisStatus("processing");
+    setLiveRecognition(null);
     try {
       const response = await fetch(`/api/items/${item.id}/analyze`, {
         method: "POST",
+        headers: { Accept: AI_STREAM_CONTENT_TYPE },
       });
-      const payload: unknown = await response.json();
-      if (!response.ok) {
+      const { ok, body: payload } = await readAiResponse(
+        response,
+        setLiveRecognition,
+      );
+      if (!ok) {
         if (
           typeof payload === "object" &&
           payload !== null &&
@@ -299,6 +307,7 @@ export function InventoryConsultFlow({
       );
     } finally {
       setAnalysisLoading(false);
+      setLiveRecognition(null);
     }
   }, [analysisLoading, item.id, router]);
 
@@ -675,12 +684,7 @@ export function InventoryConsultFlow({
             {item.status === "completed" ? "整理が完了しました。ひとつ、次の暮らしへ。" : "保存済みのプランです。できることから進めましょう。"}
           </p>
         )}
-        {analysisLoading && (
-          <LoadingState
-            title="写真を分析しています"
-            description="物品情報を確認しています。少しお待ちください。"
-          />
-        )}
+        {analysisLoading && <RecognitionLivePreview partial={liveRecognition} />}
         {analysisError && (
           <div className="notice notice-error" role="alert">
             <p>{analysisError}</p>

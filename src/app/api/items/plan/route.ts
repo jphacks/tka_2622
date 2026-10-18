@@ -15,6 +15,7 @@ import {
   logServerPerformance,
   measureServerOperation,
 } from "../../../../lib/server-performance";
+import { streamAiResponse, wantsAiStream } from "../../../../lib/ai-stream";
 
 const ClaimSchema = z.object({
   cacheHit: z.boolean(),
@@ -63,6 +64,7 @@ async function releaseGeneration(
 
 async function generateMovePlanResponse(
   requestId: string,
+  onPartial?: (partial: unknown) => void,
 ): Promise<Response> {
   const traceFields = { request_id: requestId };
   const auth = await requireApiUser();
@@ -167,7 +169,7 @@ async function generateMovePlanResponse(
     });
     const generated = await measureServerOperation(
       "move_plan.ai_generation",
-      () => generateMovePlanText(prompt),
+      () => generateMovePlanText(prompt, onPartial),
       { ...traceFields, item_count: source.items.length },
     );
     const plan = validateMovePlan(generated, source.items);
@@ -258,13 +260,17 @@ async function generateMovePlanResponse(
   }
 }
 
-export async function POST(): Promise<Response> {
+export async function POST(request?: Request): Promise<Response> {
   const requestId = crypto.randomUUID();
-  return measureServerOperation(
-    "move_plan.request_total",
-    () => generateMovePlanResponse(requestId),
-    { request_id: requestId },
-  );
+  const run = (onPartial?: (partial: unknown) => void) =>
+    measureServerOperation(
+      "move_plan.request_total",
+      () => generateMovePlanResponse(requestId, onPartial),
+      { request_id: requestId },
+    );
+  return request && wantsAiStream(request)
+    ? streamAiResponse((emitPartial) => run(emitPartial))
+    : run();
 }
 
 export async function DELETE(): Promise<Response> {

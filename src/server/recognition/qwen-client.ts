@@ -2,6 +2,7 @@ import {
   RECOGNITION_SYSTEM_PROMPT,
   RECOGNITION_USER_PROMPT,
 } from "./recognition-prompt";
+import { readChatCompletionStream } from "./qwen-stream";
 
 export type RecognitionServiceErrorCode =
   | "AI_TIMEOUT"
@@ -73,7 +74,14 @@ function getTextContent(payload: unknown): string {
   return firstChoice.message.content;
 }
 
-export async function requestQwenVision(input: QwenVisionInput): Promise<string> {
+/**
+ * Returns the model's JSON text. With `onText`, the response is streamed and
+ * `onText` receives the accumulated text as it arrives.
+ */
+export async function requestQwenVision(
+  input: QwenVisionInput,
+  onText?: (text: string) => void,
+): Promise<string> {
   const { apiKey, model, baseUrl } = readConfiguration();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -103,6 +111,7 @@ export async function requestQwenVision(input: QwenVisionInput): Promise<string>
           },
         ],
         response_format: { type: "json_object" },
+        ...(onText ? { stream: true } : {}),
       }),
       signal: controller.signal,
     });
@@ -115,6 +124,10 @@ export async function requestQwenVision(input: QwenVisionInput): Promise<string>
         "AI_UNAVAILABLE",
         "AI分析サービスを利用できません。時間をおいて再度お試しください。",
       );
+    }
+
+    if (onText) {
+      return await readChatCompletionStream(response, onText);
     }
 
     let payload: unknown;

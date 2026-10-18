@@ -5,6 +5,7 @@ import {
   requireApiUser,
 } from "../../../../../lib/supabase/server";
 import { AnalyzeResponseSchema } from "../../../../../types/recognition";
+import { streamAiResponse, wantsAiStream } from "../../../../../lib/ai-stream";
 
 export const runtime = "nodejs";
 
@@ -34,8 +35,18 @@ async function markAnalysisFailed(
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  if (wantsAiStream(request)) {
+    return streamAiResponse((emitPartial) => analyze(context, emitPartial));
+  }
+  return analyze(context);
+}
+
+async function analyze(
+  context: { params: Promise<{ id: string }> },
+  onPartial?: (partial: unknown) => void,
 ): Promise<Response> {
   const auth = await requireApiUser();
   if ("response" in auth) return auth.response;
@@ -177,10 +188,13 @@ export async function POST(
   }
 
   try {
-    const result = await analyzeItem({
-      imageBase64: Buffer.from(await image.arrayBuffer()).toString("base64"),
-      mimeType,
-    });
+    const result = await analyzeItem(
+      {
+        imageBase64: Buffer.from(await image.arrayBuffer()).toString("base64"),
+        mimeType,
+      },
+      onPartial,
+    );
     const { data, error: updateError } = await auth.supabase
       .from("user_items")
       .update({

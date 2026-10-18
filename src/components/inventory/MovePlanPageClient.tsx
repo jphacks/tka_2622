@@ -1,5 +1,7 @@
 "use client";
 
+import { MovePlanLivePreview } from "../ai/AiLivePreview";
+import { AI_STREAM_CONTENT_TYPE, readAiResponse } from "../../lib/ai-stream";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -83,6 +85,7 @@ export function MovePlanPageClient({
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [livePlan, setLivePlan] = useState<unknown>(null);
 
   useEffect(() => {
     setPlan(initialPlan);
@@ -95,13 +98,17 @@ export function MovePlanPageClient({
     setIsGenerating(true);
     setErrorMessage(null);
     try {
-      const response = await fetch("/api/items/plan", { method: "POST" });
-      const body = (await response.json()) as {
+      const response = await fetch("/api/items/plan", {
+        method: "POST",
+        headers: { Accept: AI_STREAM_CONTENT_TYPE },
+      });
+      const result = await readAiResponse(response, setLivePlan);
+      const body = (result.body ?? {}) as {
         plan?: MovePlan;
         generatedAt?: string | null;
         error?: ApiErrorResponse["error"];
       };
-      if (!response.ok || !body.plan) {
+      if (!result.ok || !body.plan) {
         throw new Error(
           body.error?.message ??
             "整理プランを作成できませんでした。もう一度お試しください。",
@@ -119,6 +126,7 @@ export function MovePlanPageClient({
       );
     } finally {
       setIsGenerating(false);
+      setLivePlan(null);
     }
   }
 
@@ -209,13 +217,7 @@ export function MovePlanPageClient({
       {shouldGenerate && (
         <section className="move-plan-generation" aria-live="polite">
           {isGenerating ? (
-            <div className="move-plan-loading" role="status">
-              <span className="move-plan-spinner" aria-hidden="true" />
-              <strong>引っ越し整理プランを作成しています…</strong>
-              <p>
-                持ち物ごとの整理方法をまとめ、引っ越しまでの予定を考えています。
-              </p>
-            </div>
+            <MovePlanLivePreview partial={livePlan} />
           ) : (
             <>
               <button
