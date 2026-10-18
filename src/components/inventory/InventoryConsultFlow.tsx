@@ -265,7 +265,15 @@ export function InventoryConsultFlow({
   const evaluateAction = useCallback(
     async (action?: Action, requestedStationId = stationId) => {
       if (!recognition || isItemUnidentified(recognition)) return;
-      if (action && action === selectedAction && result && !evaluationError) return;
+      if (
+        action &&
+        action === selectedAction &&
+        result &&
+        result.stationId === (requestedStationId ?? null) &&
+        !evaluationError
+      ) {
+        return;
+      }
 
       const requestId = ++evaluationRequest.current;
       if (action) setSelectedAction(action);
