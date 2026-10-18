@@ -38,6 +38,7 @@ function osmRelation(
       license: "ODbL-1.0 (© OpenStreetMap contributors)",
       tags: {
         shop: options.category ?? "books",
+        opening_hours: "Mo-Su 10:00-22:00",
         _reuse_candidate: {
           candidate_id: `osm-node-${objectId}`,
           shop_tag: options.category ?? "books",
@@ -73,6 +74,13 @@ function relation(
       products_handled_source_text: "ブランドメンズ古着、服飾雑貨",
       service_type_evidence: "店頭で1品から査定、買取",
       usage_notes: "店頭にお持ちいただければ１品から査定、買取いたします。",
+      opening_days: "月火水木金土日",
+      weekday_open: "12:00",
+      weekday_close: "21:00",
+      holiday_open: "11:00",
+      holiday_close: "21:00",
+      hours_notes: null,
+      source_record_json: { 営業曜日: "月火水木金土日" },
     },
   };
 }
@@ -252,6 +260,29 @@ describe("SupabaseRuleServiceProvider", () => {
     ]);
   });
 
+  it("formats recorded opening days and hours for each shop", async () => {
+    const closedDaysShop = relation("station-a", "closed-days", 300);
+    Object.assign(closedDaysShop.businesses, {
+      opening_days: "水曜日",
+      weekday_open: null,
+      weekday_close: null,
+      holiday_open: null,
+      holiday_close: null,
+      hours_notes: "午前10時30分～午後7時",
+      source_record_json: { 定休日: "水曜日" },
+    });
+    const provider = new SupabaseRuleServiceProvider(config, async () =>
+      Response.json([relation("station-a", "split-hours", 100), closedDaysShop]),
+    );
+
+    const businesses = await provider.getBusinessesByStation("station-a");
+
+    expect(businesses.map(({ openingHours }) => openingHours)).toEqual([
+      ["営業日：月火水木金土日", "営業時間：平日 12:00〜21:00／休日 11:00〜21:00"],
+      ["定休日：水曜日", "午前10時30分～午後7時"],
+    ]);
+  });
+
   it("returns OSM candidates separately without asserting they buy the selected category", async () => {
     let requestUrl = "";
     let requestApiKey = "";
@@ -282,6 +313,7 @@ describe("SupabaseRuleServiceProvider", () => {
         distanceMeters: 700,
         sourceUrl: "https://www.openstreetmap.org/node/123",
         license: "ODbL-1.0 (© OpenStreetMap contributors)",
+        openingHours: "Mo-Su 10:00-22:00",
       },
     ]);
     expect(requestApiKey).toBe(serviceConfig.apiKey);

@@ -21,6 +21,7 @@ export const ServiceBusinessSchema = z.object({
   purchaseStatus: z.enum(["confirmed", "unconfirmed"]).optional(),
   isMock: z.boolean(),
   externalUrl: z.string().url().optional(),
+  openingHours: z.array(z.string().min(1)).optional(),
 });
 
 export const OsmStoreCandidateSchema = z.object({
@@ -32,6 +33,7 @@ export const OsmStoreCandidateSchema = z.object({
   distanceMeters: z.number().int().nonnegative(),
   sourceUrl: z.string().url(),
   license: z.string().min(1),
+  openingHours: z.string().min(1).nullable().optional(),
 });
 
 export const ServiceMatchResponseSchema = z.object({

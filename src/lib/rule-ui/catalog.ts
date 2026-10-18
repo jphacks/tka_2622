@@ -17,6 +17,7 @@ const StoreSchema = z.object({
   description: z.string(),
   externalUrl: z.string().nullable(),
   isMock: z.boolean(),
+  openingHours: z.array(z.string()),
 });
 
 const OsmCandidateSchema = z.object({
@@ -28,6 +29,7 @@ const OsmCandidateSchema = z.object({
   distanceMeters: z.number(),
   sourceUrl: z.string(),
   license: z.string(),
+  openingHours: z.string().nullable(),
 });
 
 export const ruleUiCatalog = defineCatalog(schema, {

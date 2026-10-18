@@ -30,6 +30,13 @@ interface BusinessRow {
   products_handled_source_text: string | null;
   service_type_evidence: string | null;
   usage_notes: string | null;
+  opening_days: string | null;
+  weekday_open: string | null;
+  weekday_close: string | null;
+  holiday_open: string | null;
+  holiday_close: string | null;
+  hours_notes: string | null;
+  source_record_json: Record<string, unknown> | null;
 }
 
 interface StationBusinessRow {
@@ -140,6 +147,13 @@ const StationBusinessRowsSchema = z.array(
       products_handled_source_text: z.string().nullable(),
       service_type_evidence: z.string().nullable(),
       usage_notes: z.string().nullable(),
+      opening_days: z.string().nullable(),
+      weekday_open: z.string().nullable(),
+      weekday_close: z.string().nullable(),
+      holiday_open: z.string().nullable(),
+      holiday_close: z.string().nullable(),
+      hours_notes: z.string().nullable(),
+      source_record_json: z.record(z.string(), z.unknown()).nullable(),
     }),
   }),
 );
@@ -224,6 +238,45 @@ function supportedCategories(business: BusinessRow): ItemCategory[] {
   return categories;
 }
 
+function trimmed(value: string | null): string | null {
+  return value?.trim() || null;
+}
+
+function timeRange(open: string | null, close: string | null): string | null {
+  const start = trimmed(open);
+  const end = trimmed(close);
+  return start && end ? `${start}〜${end}` : null;
+}
+
+function openingHours(business: BusinessRow): string[] {
+  const lines: string[] = [];
+  const days = trimmed(business.opening_days);
+  if (days) {
+    // Some municipal sources store 定休日 in opening_days instead of 営業曜日.
+    const isClosedDays =
+      business.source_record_json !== null &&
+      "定休日" in business.source_record_json;
+    lines.push(`${isClosedDays ? "定休日" : "営業日"}：${days}`);
+  }
+  const weekday = timeRange(business.weekday_open, business.weekday_close);
+  const holiday = timeRange(business.holiday_open, business.holiday_close);
+  if (weekday && (!holiday || holiday === weekday)) {
+    lines.push(`営業時間：${weekday}`);
+  } else if (weekday || holiday) {
+    lines.push(
+      `営業時間：${[
+        weekday ? `平日 ${weekday}` : null,
+        holiday ? `休日 ${holiday}` : null,
+      ]
+        .filter(Boolean)
+        .join("／")}`,
+    );
+  }
+  const notes = trimmed(business.hours_notes);
+  if (notes) lines.push(notes);
+  return lines;
+}
+
 function validExternalUrl(value: string | null): string | undefined {
   if (!value) return undefined;
   try {
@@ -270,7 +323,7 @@ export class SupabaseRuleServiceProvider implements RuleServiceProvider {
       "station_businesses",
       {
         select:
-          "station_id,business_id,distance_meters,businesses!inner(business_id,name,address,website_url,purchase_status,business_category,products_handled_source_text,service_type_evidence,usage_notes)",
+          "station_id,business_id,distance_meters,businesses!inner(business_id,name,address,website_url,purchase_status,business_category,products_handled_source_text,service_type_evidence,usage_notes,opening_days,weekday_open,weekday_close,holiday_open,holiday_close,hours_notes,source_record_json)",
         station_id: `eq.${stationId}`,
         distance_meters: `lte.${SEARCH_RADIUS_METERS}`,
         "businesses.purchase_status": "eq.confirmed",
@@ -302,6 +355,7 @@ export class SupabaseRuleServiceProvider implements RuleServiceProvider {
         purchaseStatus: "confirmed",
         isMock: false,
         externalUrl: validExternalUrl(row.businesses.website_url),
+        openingHours: openingHours(row.businesses),
       }))
       .sort((a, b) => a.distanceMeters - b.distanceMeters);
   }
@@ -370,6 +424,7 @@ export class SupabaseRuleServiceProvider implements RuleServiceProvider {
             distanceMeters: row.distance_meters,
             sourceUrl,
             license: candidate.license ?? OSM_DATA_LICENSE,
+            openingHours: stringTag(candidate.tags, "opening_hours"),
           },
         ];
       })

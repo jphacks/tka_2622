@@ -461,6 +461,7 @@ export function buildRuleResultSpec(
             description: item.description,
             externalUrl: item.externalUrl ?? null,
             isMock: item.isMock,
+            openingHours: item.openingHours ?? [],
           })),
         },
       );
@@ -475,6 +476,7 @@ export function buildRuleResultSpec(
           distanceMeters: candidate.distanceMeters,
           sourceUrl: candidate.sourceUrl,
           license: candidate.license,
+          openingHours: candidate.openingHours ?? null,
         })),
       });
     } else if (block === "empty-state") {

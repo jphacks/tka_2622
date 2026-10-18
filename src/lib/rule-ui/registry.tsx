@@ -119,6 +119,11 @@ export const { registry: ruleUiRegistry } = defineRegistry(ruleUiCatalog, {
             {store.isMock && <span className="mock-label">モックデータ</span>}
             <span>{store.address}</span>
             <span>駅から約{store.distanceMeters}m</span>
+            {store.openingHours.length > 0 ? (
+              store.openingHours.map((line) => <span key={line}>{line}</span>)
+            ) : (
+              <span>営業時間：情報なし（店舗にご確認ください）</span>
+            )}
             <p>{store.description}</p>
             {store.externalUrl && (
               <a href={store.externalUrl} target="_blank" rel="noreferrer">
@@ -155,6 +160,10 @@ export const { registry: ruleUiRegistry } = defineRegistry(ruleUiCatalog, {
                 {candidate.longitude.toFixed(5)}
               </span>
               <span>駅から約{candidate.distanceMeters}m</span>
+              <span>
+                営業時間：
+                {candidate.openingHours ?? "OSMに営業時間タグなし"}
+              </span>
               <a href={candidate.sourceUrl} target="_blank" rel="noreferrer">
                 OpenStreetMapの地物情報
               </a>
