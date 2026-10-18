@@ -6,3 +6,5 @@ out/
 !.env.local.example
 .vercel
 supabase/.temp/
+.cache/
+__pycache__/

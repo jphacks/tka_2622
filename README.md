@@ -201,3 +201,33 @@ OSM の候補抽出および駅距離対応は ODbL 1.0 に基づく派生デー
 元の Geofabrik PBF の取得条件、ODbL の派生データベース／データベース利用条件、
 第三者由来タグの権利を確認してください。OSM 候補は店名・位置・OSM 分類タグの調査手掛かりにすぎず、買取サービス、
 営業状況、対象商品のいずれも独立確認済みという意味ではありません。
+
+## OSM 営業時間の補完
+
+既存の `businesses` データを再収集せず、`scripts/enrich_opening_hours.py` を手動で実行して
+営業時間だけを補完できます。既に平日・休日の営業時間がそろっている店は対象外です。
+既存の曜日・営業時間・住所・座標・出典列は変更せず、OSM の生の `opening_hours` と
+OSM オブジェクト参照・出典情報を別列に保存します。
+
+1. `python scripts/enrich_opening_hours.py` は既定で Dry Run です。Supabase から店舗データを読み取り、
+   既定ではローカルの `D:\tokyo_reuse_656_stations_complete_pipeline (1)\output\`
+   にある既存 OSM 候補 CSV 2 件を使用し、Overpass へはリクエストしません。ほかの場所の
+   CSV を使う場合は `--osm-csv <path>` を複数指定できます。既存 CSV が見つからない場合だけ
+   地理タイル単位の Overpass クエリへフォールバックします。既存の有効な Overpass タイル
+   キャッシュも CSV の候補と合わせて検索に使います。CSV と新鮮な Overpass データを両方使う場合は
+   `--live-overpass` を付けてください（キャッシュを無視する場合は `--live-overpass --refresh-cache`）。
+   結果と OSM 出典が入った CSV は `.cache/opening-hours-enrichment/latest-report.csv` に保存されます。
+2. `--apply` を使う場合に限り、事前に [OSM 営業時間列の migration](./supabase/migrations/20261018130000_add_osm_opening_hours.sql)
+   を Supabase SQL Editor で手動実行してください。Dry Run だけなら migration は不要です。
+3. Dry Run レポートを確認し、対象環境と書き込みを明示承認した後に限り、
+   `python scripts/enrich_opening_hours.py --apply` を実行します。`--apply` には
+   `SUPABASE_SERVICE_ROLE_KEY` と対話型の `APPLY <件数>` 確認が必要です。
+
+自動照合は出典座標が確定しており、100m 以内に正規化後の店名が一意に完全一致した候補に限定します。
+複数候補、名称差、未確定座標は CSV の人手確認対象です。OSM に営業時間タグがない場合は
+`opening_hours` を NULL のままにし、営業時間を推測・生成しません。Overpass 応答はローカルで
+7 日間キャッシュし、保存済み OSM ID は30日以内なら再照会を省略します。
+新しいデータが必要な場合は `--refresh-cache` または `--recheck-days 0` を指定してください。
+
+OSM データには `© OpenStreetMap contributors` の帰属表示と ODbL 1.0 の条件が適用されます。
+生成レポートには候補ごとの OSM URL とライセンスを記録します。
