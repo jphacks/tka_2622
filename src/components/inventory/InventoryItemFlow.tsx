@@ -7,6 +7,7 @@ import { displayItemCategory } from "../../lib/item-category";
 import { isItemUnidentified } from "../../lib/recognition-workflow";
 import { AI_STREAM_CONTENT_TYPE, readAiResponse } from "../../lib/ai-stream";
 import { RecognitionLivePreview } from "../ai/AiLivePreview";
+import { ResaleEstimateCard } from "../ai/ResaleEstimateCard";
 import {
   ITEM_CATEGORIES,
   AnalyzeResponseSchema,
@@ -507,6 +508,12 @@ export function InventoryItemFlow({
               )}
             </div>
           )}
+          {analysisStatus === "succeeded" &&
+            recognition?.resale &&
+            !recognitionUnidentified &&
+            recommendationIsCurrent && (
+              <ResaleEstimateCard estimate={recognition.resale} />
+            )}
           {analysisStatus === "succeeded" &&
             recognition &&
             !recognitionUnidentified &&

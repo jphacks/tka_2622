@@ -32,8 +32,29 @@ export const RecognizedItemSchema = z.object({
   }),
 });
 
+export const ResaleLikelihoodSchema = z.enum(["high", "medium", "low"]);
+
+/**
+ * AI estimate of whether the item could be sold second-hand. Optional and
+ * dropped when malformed, so older or partial results stay valid.
+ */
+export const ResaleEstimateSchema = z
+  .object({
+    likelihood: ResaleLikelihoodSchema,
+    reason: z.string().trim().min(1).max(200),
+    priceRange: z
+      .object({
+        min: z.number().int().min(0).max(1_000_000),
+        max: z.number().int().min(0).max(1_000_000),
+      })
+      .refine((range) => range.min <= range.max)
+      .nullable(),
+    tips: z.array(z.string().trim().min(1).max(80)).max(3).default([]),
+  });
+
 export const AnalyzeResponseSchema = z.object({
   item: RecognizedItemSchema,
+  resale: ResaleEstimateSchema.optional().catch(undefined),
   recommendation: z.object({
     action: ActionSchema.nullable(),
     reason: z.string(),
@@ -57,6 +78,7 @@ export const Pipeline2InputSchema = z.object({
 });
 
 export type Action = z.infer<typeof ActionSchema>;
+export type ResaleEstimate = z.infer<typeof ResaleEstimateSchema>;
 export type ItemCategory = z.infer<typeof ItemCategorySchema>;
 export type ConditionGrade = z.infer<typeof ConditionGradeSchema>;
 export type RecognizedItem = z.infer<typeof RecognizedItemSchema>;

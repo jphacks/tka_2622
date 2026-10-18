@@ -5536,3 +5536,114 @@ a { text-underline-offset: 4px; }
     transform: none;
   }
 }
+
+/* AI resale estimate, shown before the action recommendation. */
+.resale-card {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--paper);
+}
+
+.resale-card-head {
+  display: grid;
+  gap: 8px;
+}
+
+.resale-card-badge {
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: var(--radius-badge);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: var(--text-meta);
+  font-weight: 700;
+}
+
+.resale-card[data-likelihood="high"] .resale-card-badge {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.resale-card[data-likelihood="low"] .resale-card-badge {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.resale-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+
+.resale-card-price {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--canvas);
+}
+
+.resale-card-price span,
+.resale-card-tips > span {
+  color: var(--muted);
+  font-size: var(--text-meta);
+  font-weight: 700;
+}
+
+.resale-card-price strong {
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.resale-card > p {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: 1.75;
+}
+
+.resale-card-tips {
+  display: grid;
+  gap: 8px;
+}
+
+.resale-card-tips ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: 1.6;
+}
+
+.resale-card > small {
+  color: var(--muted);
+  font-size: var(--text-meta);
+  line-height: 1.6;
+}
+
+.resale-card-action {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.resale-card-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

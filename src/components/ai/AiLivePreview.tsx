@@ -4,9 +4,13 @@ import { displayItemCategory } from "../../lib/item-category";
 import {
   ActionSchema,
   ItemCategorySchema,
+  ResaleLikelihoodSchema,
   type Action,
 } from "../../types/recognition";
 import { Spinner } from "../ui";
+import { formatPriceRange } from "./ResaleEstimateCard";
+
+const RESALE_LABELS = { high: "高い", medium: "あり", low: "低め" } as const;
 
 const ACTION_LABELS: Record<Action, string> = {
   keep: "保管する",
@@ -84,6 +88,12 @@ export function RecognitionLivePreview({ partial }: { partial: unknown }) {
   const item = record(root?.item);
   const condition = record(item?.condition);
   const recommendation = record(root?.recommendation);
+  const resale = record(root?.resale);
+  const likelihood = ResaleLikelihoodSchema.safeParse(resale?.likelihood);
+  const priceRange = record(resale?.priceRange);
+  const priceMin = priceRange?.min;
+  const priceMax = priceRange?.max;
+  const resaleReason = text(resale?.reason);
 
   const name = text(item?.name);
   const category = ItemCategorySchema.safeParse(item?.category);
@@ -106,6 +116,23 @@ export function RecognitionLivePreview({ partial }: { partial: unknown }) {
   if (observations.length > 0) {
     rows.push({ label: "写真から見えたこと", value: observations });
   }
+  if (likelihood.success) {
+    rows.push({
+      label: "売れる可能性",
+      value: RESALE_LABELS[likelihood.data],
+    });
+  }
+  if (
+    typeof priceMin === "number" &&
+    typeof priceMax === "number" &&
+    priceMin <= priceMax
+  ) {
+    rows.push({
+      label: "買取額の目安（AIの推定）",
+      value: formatPriceRange({ min: priceMin, max: priceMax }),
+    });
+  }
+  if (resaleReason) rows.push({ label: "売れるかの理由", value: resaleReason });
   if (action.success) {
     rows.push({ label: "おすすめ", value: ACTION_LABELS[action.data] });
   }
@@ -113,7 +140,9 @@ export function RecognitionLivePreview({ partial }: { partial: unknown }) {
 
   const status = reason || action.success
     ? "整理方法を考えています…"
-    : observations.length > 0 || typeof grade === "number"
+    : resale
+      ? "売れるかを推定しています…"
+      : observations.length > 0 || typeof grade === "number"
       ? "状態を確認しています…"
       : name
         ? "物品を識別しています…"

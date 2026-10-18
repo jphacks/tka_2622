@@ -7,6 +7,7 @@ import { RuleResultView } from "../services/RuleResultView";
 import { StationSelector } from "../stations/StationSelector";
 import { DisposalLocationSelector } from "../disposal/DisposalLocationSelector";
 import { RecognitionLivePreview } from "../ai/AiLivePreview";
+import { ResaleEstimateCard } from "../ai/ResaleEstimateCard";
 import { AI_STREAM_CONTENT_TYPE, readAiResponse } from "../../lib/ai-stream";
 import { useStations } from "../../hooks/useStations";
 import {
@@ -827,6 +828,22 @@ export function InventoryConsultFlow({
 
         {recognition && (
           <div className="inventory-consult-response">
+            {recognition.resale &&
+              isRecommendationCurrent(recognition) &&
+              !isItemUnidentified(recognition) && (
+                <ResaleEstimateCard
+                  estimate={recognition.resale}
+                  action={
+                    selectedAction === "sell"
+                      ? undefined
+                      : {
+                          label: "売る方法と近くのお店を見る",
+                          disabled: item.status === "completed",
+                          onClick: () => void evaluateAction("sell"),
+                        }
+                  }
+                />
+              )}
             {result && (
               <section
                 className="inventory-consult-recommendation"
