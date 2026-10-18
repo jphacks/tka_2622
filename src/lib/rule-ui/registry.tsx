@@ -1,5 +1,6 @@
 import { defineRegistry } from "@json-render/react";
 import type { RuleNotice } from "../../server/rules/schemas";
+import { formatOsmOpeningHours } from "../osm-opening-hours";
 import { ruleUiCatalog } from "./catalog";
 
 const NOTICE_LABELS: Record<RuleNotice["type"], string> = {
@@ -162,7 +163,9 @@ export const { registry: ruleUiRegistry } = defineRegistry(ruleUiCatalog, {
               <span>駅から約{candidate.distanceMeters}m</span>
               <span>
                 営業時間：
-                {candidate.openingHours ?? "OSMに営業時間タグなし"}
+                {candidate.openingHours
+                  ? formatOsmOpeningHours(candidate.openingHours)
+                  : "OSMに営業時間タグなし"}
               </span>
               <a href={candidate.sourceUrl} target="_blank" rel="noreferrer">
                 OpenStreetMapの地物情報
