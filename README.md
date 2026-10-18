@@ -110,6 +110,7 @@
    1. [駅・リユース事業者データ](./supabase/migrations/20261017081000_create_tokyo_reuse_directory.sql)
    2. [ユーザーの持ち物・認証設定](./supabase/migrations/20261017100000_create_private_user_inventory.sql)
    3. [引っ越し日・整理プラン](./supabase/migrations/20261017230000_add_move_date_and_user_move_plans.sql)
+   4. [保存済みプランの削除](./supabase/migrations/20261018120000_add_move_plan_deletion.sql)
 
    migration は Supabase SQL Editor で手動適用してください。アプリ起動時にリモートの schema は変更しません。
 4. 開発サーバーを起動します。
@@ -168,7 +169,10 @@ OSM 候補用テーブルは公式オープンデータの商店テーブルと�
    Supabase SQL Editor で手動実行します。この migration は任意の引っ越し日とユーザーごとの
    整理プラン保存領域、本人だけが実行できる生成・保存 RPC を追加します。アプリから
    リモート schema を自動変更することはありません。
-2. `.env.local` とデプロイ先の環境変数に `QWEN_TEXT_MODEL` を設定します。生成では
+2. 保存済みプランの削除と再生成ボタンを有効にするには、
+   [保存済みプランの削除 migration](./supabase/migrations/20261018120000_add_move_plan_deletion.sql)
+   も Supabase SQL Editor で手動実行してください。アプリからリモート schema を自動変更することはありません。
+3. `.env.local` とデプロイ先の環境変数に `QWEN_TEXT_MODEL` を設定します。生成では
    `DASHSCOPE_API_KEY`、`QWEN_BASE_URL`、`QWEN_TEXT_MODEL` を使用します。たとえば
    `qwen3.7-plus` は Model Studio の文章生成および JSON object structured-output 対応モデルです。
    アカウントのリージョンで利用可能か Model Studio で確認してください。画像認識用の

@@ -23,6 +23,10 @@ const ClaimSchema = z.object({
   plan: z.unknown().nullable(),
   generatedAt: z.string().nullable(),
 });
+const DeletePlanSchema = z.object({
+  deleted: z.boolean(),
+  inProgress: z.boolean(),
+});
 
 function errorResponse(code: string, message: string, status: number) {
   return Response.json({ error: { code, message } }, { status });
@@ -261,4 +265,46 @@ export async function POST(): Promise<Response> {
     () => generateMovePlanResponse(requestId),
     { request_id: requestId },
   );
+}
+
+export async function DELETE(): Promise<Response> {
+  const auth = await requireApiUser();
+  if ("response" in auth) return auth.response;
+
+  const { data, error } = await auth.supabase.rpc(
+    "delete_user_move_plan_generation",
+  );
+  if (error) {
+    console.error("Could not delete the saved move plan.", {
+      code: error.code ?? "UNKNOWN",
+    });
+    return isMovePlanMigrationError(error)
+      ? missingPlanMigration()
+      : errorResponse(
+          "MOVE_PLAN_DELETE_FAILED",
+          "保存済みのプランを削除できませんでした。時間をおいて再度お試しください。",
+          503,
+        );
+  }
+
+  const result = DeletePlanSchema.safeParse(data);
+  if (!result.success) {
+    console.error("Move plan deletion returned an invalid result.", {
+      issueCount: result.error.issues.length,
+    });
+    return errorResponse(
+      "MOVE_PLAN_DELETE_INVALID",
+      "プランの削除結果を確認できませんでした。",
+      503,
+    );
+  }
+  if (result.data.inProgress) {
+    return errorResponse(
+      "MOVE_PLAN_GENERATION_IN_PROGRESS",
+      "プランを作成中のため削除できません。完了後にもう一度お試しください。",
+      409,
+    );
+  }
+
+  return Response.json({ deleted: result.data.deleted });
 }

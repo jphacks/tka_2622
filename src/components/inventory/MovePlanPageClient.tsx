@@ -79,7 +79,10 @@ export function MovePlanPageClient({
   const [isStale, setIsStale] = useState(initialIsStale);
   const [generatedAt, setGeneratedAt] = useState(initialGeneratedAt);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     setPlan(initialPlan);
@@ -116,6 +119,39 @@ export function MovePlanPageClient({
       );
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function deletePlan() {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const response = await fetch("/api/items/plan", { method: "DELETE" });
+      const body = (await response.json()) as {
+        deleted?: boolean;
+        error?: ApiErrorResponse["error"];
+      };
+      if (!response.ok || body.deleted !== true) {
+        throw new Error(
+          body.error?.message ??
+            "保存済みのプランを削除できませんでした。もう一度お試しください。",
+        );
+      }
+
+      setPlan(null);
+      setGeneratedAt(null);
+      setIsStale(false);
+      setConfirmDelete(false);
+      router.refresh();
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "保存済みのプランを削除できませんでした。もう一度お試しください。",
+      );
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -342,6 +378,60 @@ export function MovePlanPageClient({
               </li>
             ))}
           </ol>
+        </section>
+      )}
+
+      {hasPlan && (
+        <section className="inventory-delete-area" aria-label="引っ越しプランの削除">
+          {!confirmDelete ? (
+            <button
+              className="inventory-delete-trigger"
+              type="button"
+              onClick={() => {
+                setDeleteError(null);
+                setConfirmDelete(true);
+              }}
+            >
+              保存済みプランを削除する
+            </button>
+          ) : (
+            <div
+              className="inventory-delete-confirmation"
+              role="group"
+              aria-labelledby="move-plan-delete-title"
+              aria-describedby="move-plan-delete-description"
+            >
+              <h2 id="move-plan-delete-title">
+                保存済みのプランを削除しますか？
+              </h2>
+              <p id="move-plan-delete-description">
+                持ち物と整理方法は残ります。プランを削除すると、もう一度生成できます。
+              </p>
+              {deleteError && (
+                <p className="inventory-delete-error" role="alert">
+                  {deleteError}
+                </p>
+              )}
+              <div className="inventory-delete-confirm-actions">
+                <button
+                  className="inventory-delete-cancel"
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  キャンセル
+                </button>
+                <button
+                  className="inventory-delete-confirm"
+                  type="button"
+                  disabled={isDeleting || isGenerating}
+                  onClick={() => void deletePlan()}
+                >
+                  {isDeleting ? "削除中…" : "削除して再生成する"}
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 

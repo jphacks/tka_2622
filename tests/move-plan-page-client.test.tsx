@@ -93,4 +93,26 @@ describe("MovePlanPageClient", () => {
     expect(html).not.toContain("古いギターの梱包");
     expect(html).not.toContain("これからのスケジュール");
   });
+
+  it("offers deletion and regeneration when a saved plan exists", () => {
+    const savedPlan: MovePlan = {
+      summary: "持ち物を整理するプランです。",
+      tasks: [
+        {
+          itemId: "123e4567-e89b-42d3-a456-426614174000",
+          action: "keep",
+          taskTitle: "ギターを梱包する",
+          taskDescription: "ギターを梱包する手順です。",
+          steps: ["ケースに入れる"],
+          daysBeforeMove: 7,
+          priority: "medium",
+          requiresOfficialConfirmation: false,
+        },
+      ],
+    };
+    const html = renderMovePlanPage([], { plan: savedPlan });
+
+    expect(html).toContain("保存済みプランを削除する");
+    expect(html).not.toContain("削除して再生成する");
+  });
 });
