@@ -12,14 +12,43 @@ export interface MovePlanSource {
   completedItems: number;
 }
 
-export async function loadMovePlanSource(
+export interface MovePlanSnapshot {
+  source: MovePlanSource;
+  itemRows: Array<{
+    id: string;
+    image_path: string;
+    name: string | null;
+    category: string | null;
+    status: string;
+  }>;
+  onboardingCompleted: boolean;
+}
+
+export function createMovePlanSource(
+  itemRows: Array<Record<string, unknown>>,
+  planRows: Array<Record<string, unknown>>,
+  selectedStationId: string | null,
+  movingDate: string | null,
+): MovePlanSource {
+  const items = buildMovePlanItems(itemRows, planRows);
+  return {
+    movingDate,
+    selectedStationId,
+    inputHash: hashMovePlanInput(items, selectedStationId),
+    items,
+    totalItems: itemRows.length,
+    completedItems: itemRows.filter((item) => item.status === "completed").length,
+  };
+}
+
+export async function loadMovePlanSnapshot(
   supabase: SupabaseServerClient,
   userId: string,
-): Promise<MovePlanSource> {
+): Promise<MovePlanSnapshot> {
   const [profileResult, movingDateResult, itemsResult, plansResult] = await Promise.all([
     supabase
       .from("user_profiles")
-      .select("nearest_station_id")
+      .select("nearest_station_id, onboarding_completed")
       .eq("user_id", userId)
       .maybeSingle(),
     supabase
@@ -52,20 +81,27 @@ export async function loadMovePlanSource(
     throw new Error("引っ越しプランに必要な持ち物情報を読み込めませんでした。");
   }
 
-  const items = buildMovePlanItems(
-    (itemsResult.data ?? []) as Array<Record<string, unknown>>,
-    (plansResult.data ?? []) as Array<Record<string, unknown>>,
-  );
+  const itemRows = (itemsResult.data ?? []) as MovePlanSnapshot["itemRows"];
+  const planRows = (plansResult.data ?? []) as Array<Record<string, unknown>>;
   const selectedStationId = profileResult.data?.nearest_station_id ?? null;
   return {
-    movingDate: movingDateResult.data?.moving_date ?? null,
-    selectedStationId,
-    inputHash: hashMovePlanInput(items, selectedStationId),
-    items,
-    totalItems: itemsResult.data?.length ?? 0,
-    completedItems:
-      itemsResult.data?.filter((item) => item.status === "completed").length ?? 0,
+    source: createMovePlanSource(
+      itemRows,
+      planRows,
+      selectedStationId,
+      movingDateResult.data?.moving_date ?? null,
+    ),
+    itemRows,
+    onboardingCompleted: profileResult.data?.onboarding_completed ?? false,
   };
+}
+
+export async function loadMovePlanSource(
+  supabase: SupabaseServerClient,
+  userId: string,
+): Promise<MovePlanSource> {
+  const snapshot = await loadMovePlanSnapshot(supabase, userId);
+  return snapshot.source;
 }
 
 export function isMovePlanMigrationError(error: { code?: string }): boolean {

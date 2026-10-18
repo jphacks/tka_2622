@@ -1,14 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateProxySession } from "./src/lib/supabase/update-proxy-session";
+import {
+  isServerPerformanceLoggingEnabled,
+  measureServerOperation,
+} from "./src/lib/server-performance";
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const isItemsPage = pathname === "/items";
+  if (isItemsPage && isServerPerformanceLoggingEnabled()) {
+    request.headers.set("x-performance-request-id", crypto.randomUUID());
+  }
   const isProtectedApi =
     pathname === "/api/profile" || pathname.startsWith("/api/items");
   let session: Awaited<ReturnType<typeof updateProxySession>>;
 
   try {
-    session = await updateProxySession(request);
+    session = isItemsPage
+      ? await measureServerOperation(
+          "items.proxy.session_verification",
+          () => updateProxySession(request),
+          {
+            request_id:
+              request.headers.get("x-performance-request-id") ?? undefined,
+          },
+        )
+      : await updateProxySession(request);
   } catch (error) {
     console.error("Supabase proxy session setup failed.", error);
     return isProtectedApi

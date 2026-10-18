@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { OnboardingForm } from "../../components/account/OnboardingForm";
 import { Brand } from "../../components/account/Brand";
@@ -24,9 +25,9 @@ export default async function OnboardingPage() {
   return (
     <main className="account-stage onboarding-stage">
       <header className="account-header">
-        <a className="account-wordmark" href="/" aria-label="ものさき。">
+        <Link className="account-wordmark" href="/" aria-label="ものさき。">
           <Brand />
-        </a>
+        </Link>
         <span className="account-header-note">はじめに</span>
       </header>
       <OnboardingForm

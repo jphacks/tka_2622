@@ -9,8 +9,12 @@ import { moveDateForTask } from "../src/lib/move-plan-date";
 import { RuleResultSchema } from "../src/server/rules/schemas";
 import { POST as generateMovePlan } from "../src/app/api/items/plan/route";
 import { requireApiUser } from "../src/lib/supabase/server";
-import { loadMovePlanSource } from "../src/server/move-plan-data";
+import {
+  createMovePlanSource,
+  loadMovePlanSource,
+} from "../src/server/move-plan-data";
 import { generateMovePlanText } from "../src/server/recognition/qwen-text-client";
+import { mapSignedImageUrls } from "../src/lib/supabase/signed-image-urls";
 
 vi.mock("../src/lib/supabase/server", () => ({
   requireApiUser: vi.fn(),
@@ -109,6 +113,65 @@ function configureGeneration(
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe("mapping private image signed URLs", () => {
+  it("maps signed URLs by storage path instead of response order", () => {
+    const result = mapSignedImageUrls(
+      ["user/item-a.jpg", "user/item-b.jpg"],
+      [
+        {
+          path: "user/item-b.jpg",
+          signedUrl: "https://storage/item-b",
+          error: null,
+        },
+        {
+          path: "user/item-a.jpg",
+          signedUrl: "https://storage/item-a",
+          error: null,
+        },
+      ],
+    );
+
+    expect(result).toEqual({
+      success: true,
+      urlsByPath: new Map([
+        ["user/item-a.jpg", "https://storage/item-a"],
+        ["user/item-b.jpg", "https://storage/item-b"],
+      ]),
+    });
+  });
+
+  it("rejects partial failures and invalid or missing paths", () => {
+    expect(
+      mapSignedImageUrls(
+        ["user/item-a.jpg", "user/item-b.jpg"],
+        [
+          {
+            path: "user/item-a.jpg",
+            signedUrl: "https://storage/item-a",
+            error: null,
+          },
+          { path: "user/item-b.jpg", signedUrl: null, error: "Object not found" },
+        ],
+      ),
+    ).toEqual({ success: false, reason: "Object not found" });
+    expect(
+      mapSignedImageUrls(["user/item-a.jpg"], [
+        { path: null, signedUrl: "https://storage/unknown", error: null },
+      ]),
+    ).toEqual({ success: false, reason: "INVALID_SIGNED_URL_RESULT" });
+    expect(
+      mapSignedImageUrls(["user/item-a.jpg"], []),
+    ).toEqual({ success: false, reason: "SIGNED_URL_MISSING" });
+  });
+
+  it("accepts an empty inventory without signed URL results", () => {
+    expect(mapSignedImageUrls([], [])).toEqual({
+      success: true,
+      urlsByPath: new Map(),
+    });
+  });
 });
 
 describe("move plan validation and source handling", () => {
@@ -238,6 +301,45 @@ describe("move plan validation and source handling", () => {
     ).not.toBe(initialHash);
     expect(hashMovePlanInput([first, second], "station-b")).not.toBe(
       initialHash,
+    );
+  });
+
+  it("builds move plan summary fields from the already-loaded inventory rows", () => {
+    const source = createMovePlanSource(
+      [
+        {
+          id: itemId,
+          name: "エレクトリックギター",
+          category: "electronics",
+          status: "in_progress",
+        },
+        {
+          id: foreignItemId,
+          name: "本",
+          category: "books",
+          status: "completed",
+        },
+      ],
+      [
+        {
+          item_id: itemId,
+          selected_action: "keep",
+          handling_guide: guide,
+        },
+      ],
+      "station-a",
+      "2026-11-15",
+    );
+
+    expect(source).toMatchObject({
+      movingDate: "2026-11-15",
+      selectedStationId: "station-a",
+      totalItems: 2,
+      completedItems: 1,
+      items: [sourceItem()],
+    });
+    expect(source.inputHash).toBe(
+      hashMovePlanInput([sourceItem()], "station-a"),
     );
   });
 

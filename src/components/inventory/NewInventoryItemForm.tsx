@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ImageUploader } from "../recognition/ImageUploader";
 
@@ -60,7 +61,7 @@ export function NewInventoryItemForm() {
 
   return (
     <section className="inventory-form-panel" aria-labelledby="new-item-title">
-      <a href="/items" className="inventory-back-link">← 持ち物一覧</a>
+      <Link href="/items" className="inventory-back-link">← 持ち物一覧</Link>
       <h1 id="new-item-title">写真で持ち物を登録</h1>
       <p className="account-lead">
         写真は非公開で保存され、AIの分析に使用します。電話番号など個人情報が写らない写真を選んでください。

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { measureServerOperation } from "../server-performance";
 
 export async function getSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -32,11 +33,28 @@ export async function getSupabaseServerClient() {
   });
 }
 
-export async function requirePageUser(): Promise<User> {
-  const supabase = await getSupabaseServerClient();
+export async function requirePageUser(options?: {
+  performanceRequestId?: string;
+}): Promise<User> {
+  const performanceFields = {
+    request_id: options?.performanceRequestId,
+  };
+  const supabase = options
+    ? await measureServerOperation(
+        "items.auth.client_setup",
+        () => getSupabaseServerClient(),
+        performanceFields,
+      )
+    : await getSupabaseServerClient();
   let authResult: Awaited<ReturnType<typeof supabase.auth.getUser>>;
   try {
-    authResult = await supabase.auth.getUser();
+    authResult = options
+      ? await measureServerOperation(
+          "items.auth.get_user",
+          () => supabase.auth.getUser(),
+          performanceFields,
+        )
+      : await supabase.auth.getUser();
   } catch (error) {
     console.error("Supabase session verification request failed.", error);
     throw new Error("認証サービスに接続できません。時間をおいて再度お試しください。");

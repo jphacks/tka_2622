@@ -11,6 +11,10 @@ import {
   generateMovePlanText,
   QwenTextServiceError,
 } from "../../../../server/recognition/qwen-text-client";
+import {
+  logServerPerformance,
+  measureServerOperation,
+} from "../../../../lib/server-performance";
 
 const ClaimSchema = z.object({
   cacheHit: z.boolean(),
@@ -53,13 +57,20 @@ async function releaseGeneration(
   }
 }
 
-export async function POST(): Promise<Response> {
+async function generateMovePlanResponse(
+  requestId: string,
+): Promise<Response> {
+  const traceFields = { request_id: requestId };
   const auth = await requireApiUser();
   if ("response" in auth) return auth.response;
 
   let source: Awaited<ReturnType<typeof loadMovePlanSource>>;
   try {
-    source = await loadMovePlanSource(auth.supabase, auth.user.id);
+    source = await measureServerOperation(
+      "move_plan.source_load",
+      () => loadMovePlanSource(auth.supabase, auth.user.id),
+      traceFields,
+    );
   } catch (error) {
     if (error instanceof Error) {
       console.error("Could not prepare the move plan source.", {
@@ -81,12 +92,14 @@ export async function POST(): Promise<Response> {
   }
 
   const generationToken = crypto.randomUUID();
-  const { data: claimData, error: claimError } = await auth.supabase.rpc(
-    "claim_user_move_plan_generation",
-    {
-      p_input_hash: source.inputHash,
-      p_generation_token: generationToken,
-    },
+  const { data: claimData, error: claimError } = await measureServerOperation(
+    "move_plan.generation_claim",
+    async () =>
+      await auth.supabase.rpc("claim_user_move_plan_generation", {
+        p_input_hash: source.inputHash,
+        p_generation_token: generationToken,
+      }),
+    traceFields,
   );
   if (claimError) {
     console.error("Could not claim move plan generation.", {
@@ -139,12 +152,27 @@ export async function POST(): Promise<Response> {
   }
 
   try {
-    const generated = await generateMovePlanText(
-      buildMovePlanPrompt(source.items, source.selectedStationId),
+    const prompt = buildMovePlanPrompt(
+      source.items,
+      source.selectedStationId,
+    );
+    logServerPerformance("move_plan.prompt_prepared", {
+      ...traceFields,
+      item_count: source.items.length,
+      prompt_bytes: new TextEncoder().encode(prompt).byteLength,
+    });
+    const generated = await measureServerOperation(
+      "move_plan.ai_generation",
+      () => generateMovePlanText(prompt),
+      { ...traceFields, item_count: source.items.length },
     );
     const plan = validateMovePlan(generated, source.items);
 
-    const latestSource = await loadMovePlanSource(auth.supabase, auth.user.id);
+    const latestSource = await measureServerOperation(
+      "move_plan.source_recheck",
+      () => loadMovePlanSource(auth.supabase, auth.user.id),
+      traceFields,
+    );
     if (latestSource.inputHash !== source.inputHash) {
       await releaseGeneration(auth.supabase, generationToken);
       return errorResponse(
@@ -154,13 +182,15 @@ export async function POST(): Promise<Response> {
       );
     }
 
-    const { data: savedData, error: saveError } = await auth.supabase.rpc(
-      "save_user_move_plan_generation",
-      {
-        p_input_hash: source.inputHash,
-        p_generation_token: generationToken,
-        p_plan_data: plan,
-      },
+    const { data: savedData, error: saveError } = await measureServerOperation(
+      "move_plan.save_result",
+      async () =>
+        await auth.supabase.rpc("save_user_move_plan_generation", {
+          p_input_hash: source.inputHash,
+          p_generation_token: generationToken,
+          p_plan_data: plan,
+        }),
+      traceFields,
     );
     if (saveError) {
       console.error("Could not save the generated move plan.", {
@@ -222,4 +252,13 @@ export async function POST(): Promise<Response> {
       502,
     );
   }
+}
+
+export async function POST(): Promise<Response> {
+  const requestId = crypto.randomUUID();
+  return measureServerOperation(
+    "move_plan.request_total",
+    () => generateMovePlanResponse(requestId),
+    { request_id: requestId },
+  );
 }

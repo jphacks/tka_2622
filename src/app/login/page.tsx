@@ -4,7 +4,6 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { MovingHomeIllustration } from "../../components/account/MovingHomeIllustration";
 import { Brand } from "../../components/account/Brand";
-import { getSupabaseBrowserClient } from "../../lib/supabase/browser";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,6 +19,9 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      const { getSupabaseBrowserClient } = await import(
+        "../../lib/supabase/browser"
+      );
       const supabase = getSupabaseBrowserClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),

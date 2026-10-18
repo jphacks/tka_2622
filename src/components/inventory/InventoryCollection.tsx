@@ -172,7 +172,7 @@ export function InventoryCollection({
               const status = getItemStatus(item);
               return (
                 <li key={item.id}>
-                  <a
+                  <Link
                     href={`/items/${item.id}`}
                     className="inventory-card"
                     aria-label={`${item.name ?? "分析待ちの持ち物"}、${status.label}。詳細を開く`}
@@ -195,20 +195,20 @@ export function InventoryCollection({
                     <span className="inventory-card-arrow" aria-hidden="true">
                       →
                     </span>
-                  </a>
+                  </Link>
                 </li>
               );
             })}
           </ul>
         )}
       </section>
-      <a className="inventory-photo-cta" href="/items/new">
+      <Link className="inventory-photo-cta" href="/items/new">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 7.5h3l1.4-2h7.2l1.4 2h3v11H4z" />
           <circle cx="12" cy="13" r="3.2" />
         </svg>
         写真を追加する
-      </a>
+      </Link>
     </>
   );
 }

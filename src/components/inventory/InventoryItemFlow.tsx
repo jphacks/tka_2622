@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { displayItemCategory } from "../../lib/item-category";
 import { isItemUnidentified } from "../../lib/recognition-workflow";
@@ -318,9 +319,9 @@ export function InventoryItemFlow({
 
   return (
     <section className="inventory-detail">
-      <a className="inventory-back-link" href="/items">
+      <Link className="inventory-back-link" href="/items">
         ← 持ち物一覧
-      </a>
+      </Link>
 
       <article className="inventory-item-summary">
         <img src={item.imageUrl} alt={item.name ?? "登録した持ち物"} />

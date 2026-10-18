@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getSupabaseBrowserClient } from "../../lib/supabase/browser";
 import { Brand } from "./Brand";
 
 interface AccountHeaderProps {
@@ -18,6 +18,9 @@ export function AccountHeader({ brandName = "ものさき。" }: AccountHeaderPr
     setSigningOut(true);
     setError(null);
     try {
+      const { getSupabaseBrowserClient } = await import(
+        "../../lib/supabase/browser"
+      );
       const { error: signOutError } =
         await getSupabaseBrowserClient().auth.signOut();
       if (signOutError) {
@@ -35,11 +38,11 @@ export function AccountHeader({ brandName = "ものさき。" }: AccountHeaderPr
 
   return (
     <header className="inventory-header">
-      <a className="account-wordmark" href="/items" aria-label={brandName}>
+      <Link className="account-wordmark" href="/items" aria-label={brandName}>
         <Brand name={brandName} />
-      </a>
+      </Link>
       <nav aria-label="アカウントメニュー">
-        <a href="/settings">設定</a>
+        <Link href="/settings">設定</Link>
         <button type="button" onClick={() => void signOut()} disabled={signingOut}>
           {signingOut ? "…" : "ログアウト"}
         </button>
