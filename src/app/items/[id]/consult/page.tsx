@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { AccountHeader } from "../../../../components/account/AccountHeader";
 import { InventoryConsultFlow } from "../../../../components/inventory/InventoryConsultFlow";
 import { getSupabaseServerClient, requirePageUser } from "../../../../lib/supabase/server";
+import { SupabaseRuleServiceProvider } from "../../../../server/rules/providers/supabase-provider";
+import { refreshSavedPlanServices } from "../../../../server/rules/refresh-services";
 import { RuleResultSchema } from "../../../../server/rules/schemas";
 import { AnalyzeResponseSchema, ActionSchema } from "../../../../types/recognition";
 
@@ -64,6 +66,13 @@ export default async function InventoryItemConsultPage({
     throw new Error("保存済みの整理方法と手順が一致しません。");
   }
 
+  const savedResult = parsedPlan?.success
+    ? await refreshSavedPlanServices(
+        parsedPlan.data,
+        new SupabaseRuleServiceProvider(),
+      )
+    : null;
+
   const parsedRecognition = item.recognition_result
     ? AnalyzeResponseSchema.safeParse(item.recognition_result)
     : null;
@@ -93,7 +102,7 @@ export default async function InventoryItemConsultPage({
           selectedAction,
         }}
         initialRecognition={recognition}
-        initialResult={parsedPlan?.success ? parsedPlan.data : null}
+        initialResult={savedResult}
         nearestStationId={profile.nearest_station_id}
       />
     </main>
