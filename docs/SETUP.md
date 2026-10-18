@@ -146,3 +146,16 @@ OSM オブジェクト参照・出典情報を別列に保存します。
 
 OSM データには `© OpenStreetMap contributors` の帰属表示と ODbL 1.0 の条件が適用されます。
 生成レポートには候補ごとの OSM URL とライセンスを記録します。
+
+## ごみ収集日データの更新
+
+「処分する」で表示する収集曜日は、[japan-gomi-data](https://github.com/tecolicom/japan-gomi-data)（CC BY 4.0）を
+`src/data/gomi/tokyo/` に変換して同梱しています。データは区市町村ごとに有効期間があり、期間外になると
+アプリはその区市町村を「公式サイトで確認」に切り替えます。新しい年度のデータが公開されたら、次の手順で更新してください。
+
+1. japan-gomi-data をローカルに clone します（スクリプトはデータを読むだけで、clone 先のコードは実行しません）。
+2. `python scripts/build-gomi-schedule.py --source <clone したフォルダ>` を実行します。
+   `index.json`、区市町村ごとの JSON、`loaders.ts` が再生成されます。
+3. 新しく収録された区市町村があれば、その区市町村の公式「粗大ごみ」ページを確認して
+   `src/data/gomi/tokyo/bulky-waste.json` に追加し、`checkedAt` を更新します。
+4. `npm test` を実行します。全地域で収集日が求められること、粗大ごみページの対応がそろっていることを検証します。

@@ -5,6 +5,7 @@ import { InventoryConsultFlow } from "../../../../components/inventory/Inventory
 import { getSupabaseServerClient, requirePageUser } from "../../../../lib/supabase/server";
 import { SupabaseRuleServiceProvider } from "../../../../server/rules/providers/supabase-provider";
 import { refreshSavedPlanServices } from "../../../../server/rules/refresh-services";
+import { refreshDisposalGuide } from "../../../../server/disposal/collection-schedule";
 import { RuleResultSchema } from "../../../../server/rules/schemas";
 import { AnalyzeResponseSchema, ActionSchema } from "../../../../types/recognition";
 
@@ -66,12 +67,18 @@ export default async function InventoryItemConsultPage({
     throw new Error("保存済みの整理方法と手順が一致しません。");
   }
 
-  const savedResult = parsedPlan?.success
+  const refreshedResult = parsedPlan?.success
     ? await refreshSavedPlanServices(
         parsedPlan.data,
         new SupabaseRuleServiceProvider(),
       )
     : null;
+  const savedResult = refreshedResult?.disposal
+    ? {
+        ...refreshedResult,
+        disposal: await refreshDisposalGuide(refreshedResult.disposal),
+      }
+    : refreshedResult;
 
   const parsedRecognition = item.recognition_result
     ? AnalyzeResponseSchema.safeParse(item.recognition_result)

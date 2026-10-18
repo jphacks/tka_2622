@@ -88,6 +88,33 @@ export const ruleUiCatalog = defineCatalog(schema, {
       }),
       description: "利用可否の確認を前提に、譲渡先を探す候補を案内する。",
     },
+    CollectionScheduleCard: {
+      props: z.object({
+        title: z.string(),
+        bulkyWaste: z
+          .object({
+            message: z.string(),
+            url: z.string().nullable(),
+            linkLabel: z.string(),
+          })
+          .nullable(),
+        rows: z.array(
+          z.object({
+            label: z.string(),
+            rule: z.string(),
+            next: z.string().nullable(),
+          }),
+        ),
+        emptyMessage: z.string().nullable(),
+        unknownDatesNote: z.string().nullable(),
+        officialUrl: z.string().nullable(),
+        officialLabel: z.string(),
+        sourceText: z.string().nullable(),
+        sourceUrl: z.string(),
+      }),
+      description:
+        "選択した区市町村・地域のごみ収集曜日と、粗大ごみの申込み案内を表示する。",
+    },
     DisposalVerificationCard: {
       props: z.object({
         title: z.string(),

@@ -8,6 +8,7 @@ import {
   OsmStoreCandidateSchema,
   ServiceBusinessSchema,
 } from "../../types/service";
+import { DisposalGuideSchema } from "../../types/disposal";
 
 export const WorkingStatusSchema = z.enum([
   "working",
@@ -32,6 +33,7 @@ export const RuleInputSchema = z.object({
   preferredAction: ActionSchema.optional(),
   selectedAction: ActionSchema.optional(),
   municipalityCode: z.string().trim().min(1).optional(),
+  disposalArea: z.string().trim().min(1).max(100).optional(),
   location: z
     .object({
       municipalityCode: z.string().trim().min(1).optional(),
@@ -94,6 +96,7 @@ export const RuleResultSchema = z.object({
   }),
   notices: z.array(RuleNoticeSchema),
   sections: z.array(z.string().min(1)),
+  disposal: DisposalGuideSchema.nullable().optional(),
 });
 
 export type RuleInput = z.infer<typeof RuleInputSchema>;

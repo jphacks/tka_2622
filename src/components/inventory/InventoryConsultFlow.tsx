@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { RuleResultView } from "../services/RuleResultView";
 import { StationSelector } from "../stations/StationSelector";
+import { DisposalLocationSelector } from "../disposal/DisposalLocationSelector";
 import { useStations } from "../../hooks/useStations";
 import {
   displayItemCategory,
@@ -63,6 +64,59 @@ const ACTION_LABELS: Record<Action, string> = {
   give: "譲る",
   dispose: "処分する",
 };
+
+interface DisposalLocation {
+  municipalityCode: string | null;
+  area: string | null;
+}
+
+const DISPOSAL_LOCATION_STORAGE_KEY = "monosaki.disposalLocation";
+
+function disposalRequestFields(location: DisposalLocation) {
+  return {
+    ...(location.municipalityCode
+      ? { municipalityCode: location.municipalityCode }
+      : {}),
+    ...(location.municipalityCode && location.area
+      ? { disposalArea: location.area }
+      : {}),
+  };
+}
+
+function readRememberedDisposalLocation(): DisposalLocation | null {
+  try {
+    const value: unknown = JSON.parse(
+      window.localStorage.getItem(DISPOSAL_LOCATION_STORAGE_KEY) ?? "null",
+    );
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "municipalityCode" in value &&
+      typeof value.municipalityCode === "string" &&
+      /^13\d{3}$/.test(value.municipalityCode)
+    ) {
+      return {
+        municipalityCode: value.municipalityCode,
+        area:
+          "area" in value && typeof value.area === "string" ? value.area : null,
+      };
+    }
+  } catch {
+    // Storage can be unavailable (private mode, blocked site data).
+  }
+  return null;
+}
+
+function rememberDisposalLocation(location: DisposalLocation): void {
+  try {
+    window.localStorage.setItem(
+      DISPOSAL_LOCATION_STORAGE_KEY,
+      JSON.stringify(location),
+    );
+  } catch {
+    // Remembering the area is a convenience only.
+  }
+}
 
 function errorMessage(payload: unknown, fallback: string): string {
   if (
@@ -143,6 +197,12 @@ export function InventoryConsultFlow({
   const [planSaved, setPlanSaved] = useState(initialResult !== null);
   const [stationId, setStationId] = useState(
     initialResult?.stationId ?? nearestStationId,
+  );
+  const [disposalLocation, setDisposalLocation] = useState<DisposalLocation>(
+    () => ({
+      municipalityCode: initialResult?.disposal?.municipality.code ?? null,
+      area: initialResult?.disposal?.area ?? null,
+    }),
   );
   const [evaluationLoading, setEvaluationLoading] = useState(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
@@ -263,13 +323,21 @@ export function InventoryConsultFlow({
   }, [analysisStatus, recognition, router]);
 
   const evaluateAction = useCallback(
-    async (action?: Action, requestedStationId = stationId) => {
+    async (
+      action?: Action,
+      requestedStationId = stationId,
+      requestedDisposal = disposalLocation,
+    ) => {
       if (!recognition || isItemUnidentified(recognition)) return;
       if (
         action &&
         action === selectedAction &&
         result &&
         result.stationId === (requestedStationId ?? null) &&
+        (action !== "dispose" ||
+          ((result.disposal?.municipality.code ?? null) ===
+            requestedDisposal.municipalityCode &&
+            (result.disposal?.area ?? null) === requestedDisposal.area)) &&
         !evaluationError
       ) {
         return;
@@ -301,6 +369,7 @@ export function InventoryConsultFlow({
               ? recognition.recommendation.reason
               : undefined,
             ...(action ? { selectedAction: action } : {}),
+            ...disposalRequestFields(requestedDisposal),
           }),
         });
         const payload: unknown = await response.json();
@@ -332,7 +401,14 @@ export function InventoryConsultFlow({
         }
       }
     },
-    [evaluationError, recognition, result, selectedAction, stationId],
+    [
+      disposalLocation,
+      evaluationError,
+      recognition,
+      result,
+      selectedAction,
+      stationId,
+    ],
   );
 
   useEffect(() => {
@@ -355,6 +431,38 @@ export function InventoryConsultFlow({
   );
   const stations = useStations(stationId, handleStationChange);
 
+  const rememberedLocationApplied = useRef(false);
+  useEffect(() => {
+    if (rememberedLocationApplied.current || disposalLocation.municipalityCode) {
+      return;
+    }
+    rememberedLocationApplied.current = true;
+    const remembered = readRememberedDisposalLocation();
+    if (!remembered) return;
+    setDisposalLocation(remembered);
+    if (selectedAction === "dispose" && !planSaved) {
+      void evaluateAction("dispose", stationId, remembered);
+    }
+  }, [
+    disposalLocation.municipalityCode,
+    evaluateAction,
+    planSaved,
+    selectedAction,
+    stationId,
+  ]);
+
+  const handleDisposalLocationChange = useCallback(
+    (municipalityCode: string, area: string | null) => {
+      const next = { municipalityCode, area };
+      setDisposalLocation(next);
+      rememberDisposalLocation(next);
+      if (selectedAction === "dispose") {
+        void evaluateAction("dispose", stationId, next);
+      }
+    },
+    [evaluateAction, selectedAction, stationId],
+  );
+
   async function savePlan() {
     if (!selectedAction || !result || savingPlan || planSaved) return;
     setSavingPlan(true);
@@ -366,6 +474,9 @@ export function InventoryConsultFlow({
         body: JSON.stringify({
           selectedAction,
           stationId: selectedAction === "sell" ? stationId ?? undefined : undefined,
+          ...(selectedAction === "dispose"
+            ? disposalRequestFields(disposalLocation)
+            : {}),
         }),
       });
       const payload: unknown = await response.json();
@@ -782,6 +893,24 @@ export function InventoryConsultFlow({
                   error={stations.error}
                   onSelect={stations.selectStation}
                   onRetry={() => void stations.loadStations()}
+                />
+              </details>
+            )}
+            {selectedAction === "dispose" && (
+              <details
+                className="inventory-consult-station"
+                open={!disposalLocation.area}
+              >
+                <summary>
+                  ごみを出す地域
+                  {result?.disposal
+                    ? `：${result.disposal.municipality.name}${result.disposal.area ? ` ${result.disposal.area}` : ""}`
+                    : "を選択"}
+                </summary>
+                <DisposalLocationSelector
+                  municipalityCode={disposalLocation.municipalityCode}
+                  area={disposalLocation.area}
+                  onChange={handleDisposalLocationChange}
                 />
               </details>
             )}

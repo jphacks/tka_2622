@@ -2,6 +2,7 @@ import { validateSpec, type Spec } from "@json-render/core";
 import { z } from "zod";
 import type { Action, ItemCategory } from "../../types/recognition";
 import type { RuleResult } from "../../server/rules/schemas";
+import type { DisposalGuide } from "../../types/disposal";
 import { ruleUiCatalog } from "./catalog";
 import { displayItemCategory, isMusicalInstrumentName } from "../item-category";
 
@@ -39,6 +40,7 @@ const RuleUiBlockSchema = z.enum([
   "checklist",
   "transfer-channels",
   "disposal-verification",
+  "collection-schedule",
   "packing-advice",
   "action-cta",
   "store-list",
@@ -66,7 +68,7 @@ export const deterministicRuleUiComposer: RuleUiComposer = {
     ];
     if (result.selectedAction === "give") blocks.push("transfer-channels");
     if (result.selectedAction === "dispose") {
-      blocks.push("disposal-verification");
+      blocks.push(result.disposal ? "collection-schedule" : "disposal-verification");
     }
     if (result.selectedAction === "keep") blocks.push("packing-advice");
     blocks.push("checklist", "action-cta");
@@ -298,6 +300,64 @@ function emptyStateContent(result: RuleResult): {
   }
 }
 
+const WEEKDAY_SHORT = ["日", "月", "火", "水", "木", "金", "土"];
+
+function formatCollectionDate(date: string): string {
+  const [, month, day] = date.split("-").map(Number);
+  const weekday = WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()];
+  return `${month}月${day}日（${weekday}）`;
+}
+
+function formatFullDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return `${year}年${month}月${day}日`;
+}
+
+function collectionScheduleProps(disposal: DisposalGuide) {
+  const place = `${disposal.municipality.name}${disposal.area ? ` ${disposal.area}` : ""}`;
+  // Categories collected on the same days are shown as one row.
+  const rows: Array<{ label: string; rule: string; next: string | null }> = [];
+  for (const collection of disposal.schedule?.collections ?? []) {
+    const rule = collection.rules.join("／");
+    const next =
+      collection.nextDates.length > 0
+        ? `次回 ${collection.nextDates.map(formatCollectionDate).join("・")}`
+        : null;
+    const existing = rows.find((row) => row.rule === rule && row.next === next);
+    if (existing) existing.label = `${existing.label}・${collection.label}`;
+    else rows.push({ label: collection.label, rule, next });
+  }
+
+  const emptyMessage =
+    disposal.status === "area_required"
+      ? "地域（町丁目）を選ぶと、収集曜日を表示します。"
+      : disposal.status === "no_schedule"
+        ? `${disposal.municipality.name}の収集日データはまだ収録していません。公式の収集日案内で確認してください。`
+        : null;
+
+  return {
+    title: `${place}のごみ収集日`,
+    bulkyWaste: disposal.bulkyWaste.required
+      ? {
+          message: `この品目は粗大ごみにあたる可能性があります。粗大ごみは収集曜日が決まっておらず、事前の申込みと手数料が必要です。${disposal.bulkyWaste.pageUrl ? "" : "申込み方法は下の公式案内から確認してください。"}`,
+          url: disposal.bulkyWaste.pageUrl,
+          linkLabel: `${disposal.municipality.name}の粗大ごみ申込み案内`,
+        }
+      : null,
+    rows,
+    emptyMessage,
+    unknownDatesNote: disposal.schedule?.hasUnknownDatesAhead
+      ? "年末年始など、収集日が確定していない期間があります。公式の告知を確認してください。"
+      : null,
+    officialUrl: disposal.municipality.officialUrl,
+    officialLabel: `${disposal.municipality.name}の収集日案内（公式）`,
+    sourceText: disposal.schedule
+      ? `出典：${disposal.attribution.name}（${disposal.attribution.license}）${disposal.schedule.edition ? `・${disposal.schedule.edition}` : ""}（${formatFullDate(disposal.schedule.validUntil)}まで）`
+      : null,
+    sourceUrl: disposal.attribution.url,
+  };
+}
+
 function safePlan(result: RuleResult, composer: RuleUiComposer): RuleUiPlan {
   const parsed = RuleUiPlanSchema.safeParse(composer.compose(result));
   if (!parsed.success) {
@@ -312,7 +372,11 @@ function safePlan(result: RuleResult, composer: RuleUiComposer): RuleUiPlan {
     "action-cta",
     ...(result.selectedAction === "give" ? ["transfer-channels" as const] : []),
     ...(result.selectedAction === "dispose"
-      ? ["disposal-verification" as const]
+      ? [
+          result.disposal
+            ? ("collection-schedule" as const)
+            : ("disposal-verification" as const),
+        ]
       : []),
     ...(result.selectedAction === "keep" ? ["packing-advice" as const] : []),
     ...(result.selectedAction === "sell"
@@ -371,12 +435,16 @@ export function buildRuleResultSpec(
   const visibleBlocks =
     options.stepsFirst === true
       ? [
+          ...filteredBlocks.filter((block) => block === "collection-schedule"),
           ...filteredBlocks.filter((block) => block === "checklist"),
           ...filteredBlocks.filter(
             (block) => block !== "checklist" && block === "action-guide",
           ),
           ...filteredBlocks.filter(
-            (block) => block !== "checklist" && block !== "action-guide",
+            (block) =>
+              block !== "checklist" &&
+              block !== "action-guide" &&
+              block !== "collection-schedule",
           ),
         ]
       : filteredBlocks;
@@ -427,6 +495,12 @@ export function buildRuleResultSpec(
       add("transfer-channels", "TransferChannelsCard", {
         channels: transferChannels(result),
       });
+    } else if (block === "collection-schedule" && result.disposal) {
+      add(
+        "collection-schedule",
+        "CollectionScheduleCard",
+        collectionScheduleProps(result.disposal),
+      );
     } else if (block === "disposal-verification") {
       add("disposal-verification", "DisposalVerificationCard", {
         title: "自治体の公式案内で確認すること",

@@ -8,6 +8,8 @@ import { isRecommendationCurrent } from "../../../../../lib/recognition-workflow
 const PayloadSchema = z.object({
   selectedAction: z.enum(["sell", "give", "dispose", "keep"]),
   stationId: z.string().trim().min(1).optional(),
+  municipalityCode: z.string().regex(/^13\d{3}$/).optional(),
+  disposalArea: z.string().trim().min(1).max(100).optional(),
 });
 
 export async function POST(
@@ -143,6 +145,8 @@ export async function POST(
             ? item.recommendation_reason
             : undefined,
           selectedAction: parsed.data.selectedAction,
+          municipalityCode: parsed.data.municipalityCode,
+          disposalArea: parsed.data.disposalArea,
         },
         serviceProvider,
       ),

@@ -3977,6 +3977,100 @@ summary:focus-visible {
   font-weight: 700;
 }
 
+.rule-collection-schedule > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-body);
+  line-height: 1.7;
+}
+
+.rule-collection-schedule > a,
+.rule-collection-bulky a,
+.rule-collection-source a {
+  color: var(--green-dark);
+  font-size: var(--text-meta);
+  font-weight: 700;
+}
+
+.rule-collection-bulky {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--warning-soft);
+}
+
+.rule-collection-bulky p {
+  margin: 0;
+  color: var(--warning);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.rule-collection-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rule-collection-list li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+}
+
+.rule-collection-list li + li {
+  border-top: 1px solid var(--line);
+}
+
+.rule-collection-list strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+
+.rule-collection-list span {
+  color: var(--muted);
+  font-size: var(--text-meta);
+}
+
+.rule-collection-list .rule-collection-rule {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.rule-collection-schedule > .rule-collection-source {
+  font-size: var(--text-meta);
+}
+
+.disposal-location {
+  display: grid;
+  gap: 14px;
+}
+
+.disposal-location .field {
+  gap: 8px;
+}
+
+.disposal-location .field > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.disposal-location .field select {
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink);
+  font-size: 15px;
+}
+
 .rule-notices {
   gap: 8px;
   padding: 12px;

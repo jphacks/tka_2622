@@ -72,6 +72,50 @@ export const { registry: ruleUiRegistry } = defineRegistry(ruleUiCatalog, {
         <p>募集条件や受入れ可否は各窓口に確認してください。</p>
       </section>
     ),
+    CollectionScheduleCard: ({ props }) => (
+      <section
+        className="rule-card rule-collection-schedule"
+        id="collection-schedule"
+        aria-labelledby="collection-schedule-title"
+      >
+        <h3 id="collection-schedule-title">{props.title}</h3>
+        {props.bulkyWaste && (
+          <div className="rule-collection-bulky">
+            <p>{props.bulkyWaste.message}</p>
+            {props.bulkyWaste.url && (
+              <a href={props.bulkyWaste.url} target="_blank" rel="noreferrer">
+                {props.bulkyWaste.linkLabel}
+              </a>
+            )}
+          </div>
+        )}
+        {props.rows.length > 0 && (
+          <ul className="rule-collection-list">
+            {props.rows.map((row) => (
+              <li key={row.label}>
+                <strong>{row.label}</strong>
+                <span className="rule-collection-rule">{row.rule}</span>
+                {row.next && <span>{row.next}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {props.emptyMessage && <p>{props.emptyMessage}</p>}
+        {props.unknownDatesNote && <p>{props.unknownDatesNote}</p>}
+        {props.officialUrl && (
+          <a href={props.officialUrl} target="_blank" rel="noreferrer">
+            {props.officialLabel}
+          </a>
+        )}
+        {props.sourceText && (
+          <p className="rule-collection-source">
+            <a href={props.sourceUrl} target="_blank" rel="noreferrer">
+              {props.sourceText}
+            </a>
+          </p>
+        )}
+      </section>
+    ),
     DisposalVerificationCard: ({ props }) => (
       <section
         className="rule-card rule-disposal-verification"

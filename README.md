@@ -39,7 +39,7 @@ flowchart LR
 
 #### 2. 次の一歩とお店がわかる
 
-選んだ方法に合わせて、手順と注意点（リチウムイオン電池、大型家具など）を表示します。「売る」を選ぶと、**東京都内 656 駅** から選んだ駅の 3km 以内にあるリユースショップを、営業時間（「月〜日 11:00〜20:00」の形式）とあわせて距離順に表示します。
+選んだ方法に合わせて、手順と注意点（リチウムイオン電池、大型家具など）を表示します。「処分する」を選ぶと、区市町村と町丁目を選ぶだけで **ごみの種類ごとの収集曜日と次回の収集日** がわかります（東京都内 16 区市・1,972 地域。粗大ごみは区市の申込み案内へ案内）。「売る」を選ぶと、**東京都内 656 駅** から選んだ駅の 3km 以内にあるリユースショップを、営業時間（「月〜日 11:00〜20:00」の形式）とあわせて距離順に表示します。
 
 #### 3. 引っ越し日までのプランに自動でまとまる
 
@@ -118,4 +118,4 @@ npm ci && cp .env.local.example .env.local && npm run dev
 
 ## データの出典とライセンス
 
-国土交通省 国土数値情報「鉄道 N02 2025」（CC BY 4.0）／東京都内区市町村のリユース事業者オープンデータ（CC BY 4.0）／© [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/)）。OSM 由来の候補は、買取対応や営業状況を確認したものではありません。
+国土交通省 国土数値情報「鉄道 N02 2025」（CC BY 4.0）／ごみ収集日：[japan-gomi-data](https://github.com/tecolicom/japan-gomi-data)（CC BY 4.0）／東京都内区市町村のリユース事業者オープンデータ（CC BY 4.0）／© [OpenStreetMap contributors](https://www.openstreetmap.org/copyright)（[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/)）。OSM 由来の候補は、買取対応や営業状況を確認したものではありません。
