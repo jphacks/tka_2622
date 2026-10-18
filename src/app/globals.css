@@ -1043,13 +1043,26 @@ summary:focus-visible {
   background: transparent;
 }
 
-.move-plan-item > img {
+.move-plan-item-photo {
+  display: grid;
   width: 48px;
   height: 48px;
   flex: 0 0 48px;
+  place-items: center;
+  overflow: hidden;
   border-radius: 10px;
   background: #eeede9;
+}
+
+.move-plan-item-photo > img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+}
+
+.move-plan-item-photo-placeholder {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .move-plan-item-copy {

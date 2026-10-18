@@ -8,7 +8,7 @@ import {
 } from "../../../server/move-plan-data";
 import { MovePlanSchema } from "../../../server/move-plan";
 import { getSupabaseServerClient, requirePageUser } from "../../../lib/supabase/server";
-import { mapSignedImageUrls } from "../../../lib/supabase/signed-image-urls";
+import { mapAvailableSignedImageUrls } from "../../../lib/supabase/signed-image-urls";
 
 export const metadata: Metadata = { title: "引っ越し整理プラン" };
 
@@ -78,30 +78,30 @@ export default async function MovePlanPage() {
       });
       throw new Error("持ち物の写真を読み込めませんでした。");
     }
-    const mappedImages = mapSignedImageUrls(
+    const mappedImages = mapAvailableSignedImageUrls(
       itemRows.map((item) => item.image_path),
       signedImages,
     );
-    if (!mappedImages.success) {
+    if (!mappedImages) {
       console.error("Could not create move plan item photo URLs.", {
-        reason: mappedImages.reason,
+        reason: "DUPLICATE_REQUESTED_PATHS",
       });
       throw new Error("持ち物の写真を読み込めませんでした。");
+    }
+    if (mappedImages.unavailableCount > 0 || mappedImages.invalidResultCount > 0) {
+      console.warn("Some move plan item photos are unavailable.", {
+        unavailableCount: mappedImages.unavailableCount,
+        invalidResultCount: mappedImages.invalidResultCount,
+      });
     }
     signedImageByPath = mappedImages.urlsByPath;
   }
   const cards = itemRows.map((item) => {
     const image = signedImageByPath.get(item.image_path);
-    if (!image) {
-      console.error("Could not create a move plan item photo URL.", {
-        reason: "SIGNED_URL_MISSING",
-      });
-      throw new Error("持ち物の写真を読み込めませんでした。");
-    }
     const plan = validPlansById.get(item.id);
     return {
       id: item.id,
-      imageUrl: image,
+      imageUrl: image ?? null,
       name: plan?.name ?? item.name ?? "名前未確認",
       action: plan?.action ?? null,
       status: item.status as "pending" | "in_progress" | "completed",

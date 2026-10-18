@@ -8,6 +8,12 @@ export type SignedImageUrlMapResult =
   | { success: true; urlsByPath: Map<string, string> }
   | { success: false; reason: string };
 
+export interface AvailableSignedImageUrlMap {
+  urlsByPath: Map<string, string>;
+  unavailableCount: number;
+  invalidResultCount: number;
+}
+
 export function mapSignedImageUrls(
   requestedPaths: string[],
   results: SignedImageUrlResult[],
@@ -45,4 +51,47 @@ export function mapSignedImageUrls(
   }
 
   return { success: true, urlsByPath };
+}
+
+export function mapAvailableSignedImageUrls(
+  requestedPaths: string[],
+  results: SignedImageUrlResult[],
+): AvailableSignedImageUrlMap | null {
+  const requestedPathSet = new Set(requestedPaths);
+  if (requestedPathSet.size !== requestedPaths.length) return null;
+
+  const urlsByPath = new Map<string, string>();
+  const seenPaths = new Set<string>();
+  const duplicatePaths = new Set<string>();
+  let invalidResultCount = 0;
+
+  for (const result of results) {
+    if (!result.path || !requestedPathSet.has(result.path)) {
+      invalidResultCount += 1;
+      continue;
+    }
+    if (seenPaths.has(result.path)) {
+      duplicatePaths.add(result.path);
+      urlsByPath.delete(result.path);
+      invalidResultCount += 1;
+      continue;
+    }
+
+    seenPaths.add(result.path);
+    if (result.signedUrl && !result.error) {
+      urlsByPath.set(result.path, result.signedUrl);
+    } else {
+      invalidResultCount += 1;
+    }
+  }
+
+  for (const path of duplicatePaths) {
+    urlsByPath.delete(path);
+  }
+
+  return {
+    urlsByPath,
+    unavailableCount: requestedPaths.length - urlsByPath.size,
+    invalidResultCount,
+  };
 }

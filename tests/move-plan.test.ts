@@ -14,7 +14,10 @@ import {
   loadMovePlanSource,
 } from "../src/server/move-plan-data";
 import { generateMovePlanText } from "../src/server/recognition/qwen-text-client";
-import { mapSignedImageUrls } from "../src/lib/supabase/signed-image-urls";
+import {
+  mapAvailableSignedImageUrls,
+  mapSignedImageUrls,
+} from "../src/lib/supabase/signed-image-urls";
 
 vi.mock("../src/lib/supabase/server", () => ({
   requireApiUser: vi.fn(),
@@ -171,6 +174,41 @@ describe("mapping private image signed URLs", () => {
       success: true,
       urlsByPath: new Map(),
     });
+  });
+
+  it("keeps available move-plan images when another storage object is unavailable", () => {
+    expect(
+      mapAvailableSignedImageUrls(
+        ["user/item-a.jpg", "user/item-b.jpg"],
+        [
+          {
+            path: "user/item-a.jpg",
+            signedUrl: "https://storage/item-a",
+            error: null,
+          },
+          {
+            path: "user/item-b.jpg",
+            signedUrl: null,
+            error: "Object not found",
+          },
+        ],
+      ),
+    ).toEqual({
+      urlsByPath: new Map([["user/item-a.jpg", "https://storage/item-a"]]),
+      unavailableCount: 1,
+      invalidResultCount: 1,
+    });
+  });
+
+  it("returns an empty image map for empty inventory and rejects duplicate requested paths", () => {
+    expect(mapAvailableSignedImageUrls([], [])).toEqual({
+      urlsByPath: new Map(),
+      unavailableCount: 0,
+      invalidResultCount: 0,
+    });
+    expect(
+      mapAvailableSignedImageUrls(["same.jpg", "same.jpg"], []),
+    ).toBeNull();
   });
 });
 

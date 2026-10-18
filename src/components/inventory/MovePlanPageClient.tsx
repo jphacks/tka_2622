@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { moveDateForTask } from "../../lib/move-plan-date";
 import type { MovePlan } from "../../server/move-plan";
 
@@ -10,7 +10,7 @@ type ItemStatus = "pending" | "in_progress" | "completed";
 
 interface MovePlanItemCard {
   id: string;
-  imageUrl: string;
+  imageUrl: string | null;
   name: string;
   action: MovePlan["tasks"][number]["action"] | null;
   status: ItemStatus;
@@ -80,6 +80,12 @@ export function MovePlanPageClient({
   const [generatedAt, setGeneratedAt] = useState(initialGeneratedAt);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPlan(initialPlan);
+    setIsStale(initialIsStale);
+    setGeneratedAt(initialGeneratedAt);
+  }, [initialPlan, initialIsStale, initialGeneratedAt]);
 
   async function generatePlan() {
     if (isGenerating || selectedItemCount === 0 || !generationAvailable) return;
@@ -222,7 +228,15 @@ export function MovePlanPageClient({
           <ul className="move-plan-item-list">
             {items.map((item) => (
               <li key={item.id} className="move-plan-item">
-                <img src={item.imageUrl} alt="" loading="lazy" />
+                <span className="move-plan-item-photo">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt="" loading="lazy" />
+                  ) : (
+                    <span className="move-plan-item-photo-placeholder">
+                      写真なし
+                    </span>
+                  )}
+                </span>
                 <div className="move-plan-item-copy">
                   <strong>{item.name}</strong>
                   <span>
@@ -263,7 +277,7 @@ export function MovePlanPageClient({
         )}
       </details>
 
-      {hasPlan && (
+      {hasPlan && !isStale && (
         <section className="move-plan-timeline" aria-labelledby="timeline-title">
           <div className="move-plan-section-heading">
             <div>
