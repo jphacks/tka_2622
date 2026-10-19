@@ -134,7 +134,22 @@ export default function LoginPage() {
             {submitting ? "確認しています…" : "ログイン"}
             {!submitting && <span aria-hidden="true">→</span>}
           </button>
+          <button
+            className="login-guest"
+            type="button"
+            onClick={() => router.push("/guest")}
+            disabled={submitting}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 21a8 8 0 0 0-16 0" />
+              <circle cx="12" cy="8" r="5" />
+            </svg>
+            ログインせずに試す
+          </button>
         </form>
+        <p className="login-guest-note">
+          アカウントなしで、気軽にお試しいただけます。
+        </p>
         <p className="login-admin-note">
           アカウントをお持ちでない方は、管理者に作成をご依頼ください。
         </p>
